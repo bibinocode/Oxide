@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Upload, X } from "lucide-react";
 import { apiRequest } from "../../../lib/api/client";
 import type { Taxonomy } from "../../../lib/api/types";
+import { SummaryAssistant } from "./SummaryAssistant";
 
 /** 封面只保存公开素材标识，正式媒体地址由服务端确定。 */
 export interface CoverSelection {
@@ -15,6 +16,8 @@ interface Asset {
   visibility: string;
 }
 interface PublishPanelProps {
+  title: string;
+  source: string;
   slug: string;
   summary: string;
   cover: CoverSelection;
@@ -112,6 +115,7 @@ export function PublishPanel(props: PublishPanelProps) {
               onChange={(e) => props.onSummary(e.target.value)}
             />
           </label>
+          <SummaryAssistant title={props.title} source={props.source} onApply={props.onSummary} />
           <fieldset className="space-y-3">
             <legend className="mb-3 text-sm">文章主图</legend>
             {props.cover.media_url && (

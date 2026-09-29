@@ -1,4 +1,7 @@
-//! Agent 模型注册和任务绑定管理接口。
+//! Agent 模型注册、任务绑定与生成接口。
+
+pub mod summary;
+pub mod writing;
 use axum::{
     Json,
     extract::{Path, State},

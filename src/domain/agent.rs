@@ -10,6 +10,16 @@ pub enum AgentTask {
 }
 
 impl AgentTask {
+    /// 数据库存储和 API 使用的稳定任务名。
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Writing => "writing",
+            Self::Summary => "summary",
+            Self::Image => "image",
+            Self::Chat => "chat",
+        }
+    }
+
     /// 将 API 中的稳定任务名解析为领域任务。
     pub fn parse(value: &str) -> Option<Self> {
         match value {

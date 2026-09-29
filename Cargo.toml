@@ -20,6 +20,7 @@ axum = { version = "=0.8.9", features = ["multipart"] }
 chrono = { version = "0.4", features = ["serde"] }
 cookie = "0.18"
 dotenvy = "0.15"
+futures-util = "0.3"
 hex = "0.4"
 hmac = "0.12"
 html-escape = "0.2"
@@ -31,6 +32,7 @@ pulldown-cmark = "0.13"
 qiniu-sdk = { version = "=0.2.4", default-features = false, features = ["objects", "upload", "download", "ureq"] }
 rand_core = { version = "0.6", features = ["getrandom"] }
 redis = { version = "1.0", features = ["tokio-comp"] }
+rig = { version = "=0.42.0", default-features = false, features = ["agent", "rustls"] }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "stream"] }
 rss = "2"
 sea-orm = { version = "=2.0.4", default-features = false, features = ["macros", "with-chrono", "with-json", "with-uuid", "sqlx-postgres", "runtime-tokio-rustls"] }
@@ -40,6 +42,7 @@ scraper = "0.24"
 sha2 = "0.10"
 tantivy = { version = "0.26", default-features = false, features = ["mmap", "lz4-compression"] }
 tokio = { version = "1", features = ["full"] }
+tokio-stream = "0.1"
 tower-http = { version = "0.6", features = ["trace"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }

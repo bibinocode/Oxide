@@ -1,0 +1,190 @@
+.markdown-source {
+  position: relative;
+}
+
+.markdown-source > .writing-selection-actions {
+  position: absolute;
+  z-index: 6;
+  top: 10px;
+  right: 18px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: calc(100% - 36px);
+  height: auto;
+  border: 1px solid var(--page-line);
+  background: var(--page-bg);
+  padding: 4px 6px;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 8%);
+  color: var(--page-subtle);
+}
+
+.writing-selection-actions button {
+  padding: 5px 7px;
+  color: var(--page-text);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.writing-selection-actions button:hover {
+  background: var(--page-line);
+}
+
+.writing-assistant {
+  position: absolute;
+  z-index: 8;
+  right: 16px;
+  bottom: 16px;
+  left: 16px;
+  display: flex;
+  max-height: min(75%, 680px);
+  flex-direction: column;
+  border: 1px solid var(--page-line);
+  background: var(--page-bg);
+  color: var(--page-text);
+  box-shadow: 0 12px 36px rgb(0 0 0 / 15%);
+}
+
+.writing-assistant header {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--page-line);
+  padding: 9px 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.writing-assistant header span,
+.writing-assistant header button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.writing-assistant-body {
+  display: grid;
+  gap: 10px;
+  overflow-y: auto;
+  padding: 12px;
+  font-size: 12px;
+}
+
+.writing-prompt-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.writing-prompt-row textarea,
+.writing-candidate {
+  width: 100%;
+  min-width: 0;
+  resize: vertical;
+  border: 1px solid var(--page-line);
+  background: var(--color-paper);
+  padding: 8px 10px;
+  color: var(--page-text);
+  font-family: var(--font-mono);
+  line-height: 1.5;
+}
+
+.writing-prompt-row .button-primary {
+  flex: none;
+  padding: 9px;
+}
+
+.writing-original-removed {
+  background: color-mix(in srgb, #df6358 22%, transparent);
+  text-decoration: line-through;
+  text-decoration-color: #b84237;
+}
+
+.writing-inline-review {
+  box-sizing: border-box;
+  width: min(100%, 680px);
+  margin: 8px 0 14px;
+  border-left: 3px solid var(--page-signal);
+  background: var(--page-bg);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 9%);
+  color: var(--page-text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.writing-inline-heading,
+.writing-inline-actions {
+  padding: 7px 12px;
+}
+
+.writing-inline-heading {
+  border-bottom: 1px solid var(--page-line);
+  color: var(--page-subtle);
+}
+
+.writing-inline-diff {
+  max-height: 260px;
+  overflow: auto;
+  padding: 10px 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.writing-inline-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  border-top: 1px solid var(--page-line);
+}
+
+.writing-inline-actions button {
+  color: var(--page-text);
+}
+
+.writing-inline-actions button:first-child:not(:disabled) {
+  color: var(--page-warm);
+  font-weight: 600;
+}
+
+.writing-inline-actions button:disabled {
+  opacity: 0.45;
+}
+
+.writing-diff-added {
+  background: color-mix(in srgb, #57b376 28%, var(--page-bg));
+}
+
+.writing-diff-removed {
+  background: color-mix(in srgb, #df6358 27%, var(--page-bg));
+  text-decoration: line-through;
+}
+
+.writing-candidate-edit summary {
+  cursor: pointer;
+  color: var(--page-subtle);
+}
+
+.writing-candidate-edit label {
+  display: block;
+  padding: 8px 0 4px;
+}
+
+.writing-assistant-error {
+  color: #b3332c;
+}
+
+@media (max-width: 640px) {
+  .writing-selection-actions {
+    right: 8px;
+    left: 8px;
+    justify-content: space-between;
+  }
+  .writing-assistant {
+    right: 8px;
+    bottom: 8px;
+    left: 8px;
+  }
+}

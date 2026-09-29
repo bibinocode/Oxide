@@ -147,6 +147,8 @@ pub struct HealthResponse {
         admin::storage::delete_asset, client::media::media,
         admin::agent::providers, admin::agent::create_provider, admin::agent::update_provider,
         admin::agent::delete_provider, admin::agent::bindings, admin::agent::bind_task,
+        admin::agent::summary::generate, admin::agent::writing::generate,
+        admin::agent::writing::stream,
         client::link_preview::preview, admin::notion::pages, admin::notion::sync),
     components(schemas(ApiError, ArticleSummaryResponse, ArticlePageResponse, ArticleDetailResponse, HealthResponse,
         admin::auth::LoginRequest, admin::auth::SessionResponse, admin::auth::OkResponse,
@@ -158,7 +160,10 @@ pub struct HealthResponse {
         admin::settings::SiteInput, admin::settings::TaxonomyInput, admin::taxonomy::ArticleTaxonomy,
         admin::storage::ProviderInput, admin::storage::ProviderResponse, admin::storage::AssetResponse, admin::storage::VisibilityInput,
         admin::agent::ProviderInput, admin::agent::ProviderResponse, admin::agent::BindingInput,
-        admin::agent::BindingResponse, client::link_preview::LinkPreview,
+        admin::agent::BindingResponse, admin::agent::summary::SummaryInput,
+        admin::agent::summary::SummaryResponse, admin::agent::writing::WritingInput,
+        admin::agent::writing::WritingResponse, crate::agent::writing::WritingAction,
+        client::link_preview::LinkPreview,
         admin::notion::NotionPageItem, admin::notion::NotionPageList,
         admin::notion::SyncInput, admin::notion::SyncResponse)),
     tags((name = "articles", description = "公开文章"), (name = "health", description = "进程健康检查"),
@@ -275,6 +280,18 @@ pub fn router(state: AppState) -> Router {
             axum::routing::put(admin::agent::update_provider).delete(admin::agent::delete_provider),
         )
         .route("/api/v1/admin/agent/bindings", get(admin::agent::bindings))
+        .route(
+            "/api/v1/admin/agent/summary",
+            post(admin::agent::summary::generate),
+        )
+        .route(
+            "/api/v1/admin/agent/writing",
+            post(admin::agent::writing::generate),
+        )
+        .route(
+            "/api/v1/admin/agent/writing/stream",
+            post(admin::agent::writing::stream),
+        )
         .route(
             "/api/v1/admin/agent/bindings/{task}",
             axum::routing::put(admin::agent::bind_task),
@@ -440,6 +457,9 @@ mod tests {
         assert!(doc["paths"]["/api/v1/articles/{slug}"].is_object());
         assert!(doc["paths"]["/api/v1/admin/notion/pages"].is_object());
         assert!(doc["paths"]["/api/v1/admin/notion/pages/{page_id}/sync"].is_object());
+        assert!(doc["paths"]["/api/v1/admin/agent/summary"].is_object());
+        assert!(doc["paths"]["/api/v1/admin/agent/writing"].is_object());
+        assert!(doc["paths"]["/api/v1/admin/agent/writing/stream"].is_object());
         let (status, body) = get("/health/live").await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(body["status"], "ok");

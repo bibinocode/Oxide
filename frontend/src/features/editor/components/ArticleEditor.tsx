@@ -13,6 +13,8 @@ import { EditorToolbar, type MarkdownCommand } from "./EditorToolbar";
 import { PublishPanel, type CoverSelection } from "./PublishPanel";
 import { useArticlePreview } from "../hooks/useArticlePreview";
 import { htmlToMarkdown } from "../htmlToMarkdown";
+import { useWritingAssistant } from "../hooks/useWritingAssistant";
+import { WritingAssistant } from "./WritingAssistant";
 import { ThemeControl } from "../../../components/layout/ThemeControl";
 
 const editorExtensions = [
@@ -40,6 +42,7 @@ export function ArticleEditor({ publicId }: { publicId?: string }) {
   const { session } = useAdminSession();
   const navigate = useNavigate();
   const editorView = useRef<EditorView | null>(null);
+  const writing = useWritingAssistant(editorView);
   const imageInput = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
@@ -410,10 +413,11 @@ export function ArticleEditor({ publicId }: { publicId?: string }) {
       </div>
       <div className="editor-workspace">
         <div className="editor-pane editor-edit-pane markdown-source">
+          <WritingAssistant assistant={writing} />
           <CodeMirror
             value={source}
             height="100%"
-            extensions={editorExtensions}
+            extensions={[...editorExtensions, ...writing.extensions]}
             basicSetup={{
               lineNumbers: false,
               foldGutter: false,
@@ -450,6 +454,8 @@ export function ArticleEditor({ publicId }: { publicId?: string }) {
       </footer>
       {publishOpen && (
         <PublishPanel
+          title={title}
+          source={source}
           slug={slug}
           summary={summary}
           cover={cover}

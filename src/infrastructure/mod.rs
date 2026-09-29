@@ -1,5 +1,6 @@
 //! 外部资源的具体适配器。
 
+pub mod agent;
 pub mod article_repository;
 pub mod notion;
 pub mod notion_media;

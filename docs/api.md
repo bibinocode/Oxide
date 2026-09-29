@@ -53,6 +53,9 @@ Axum 0.8.9 默认监听 `127.0.0.1:3001`。TanStack Start 开发服务监听 `12
 | PUT、DELETE | `/api/v1/admin/agent/providers/{id}` | 更新或删除模型提供商 |
 | GET | `/api/v1/admin/agent/bindings` | 查询任务到模型的绑定 |
 | PUT | `/api/v1/admin/agent/bindings/{task}` | 绑定 writing、summary、image、chat 任务 |
+| POST | `/api/v1/admin/agent/summary` | 用当前标题和 Markdown 正文生成摘要候选，不保存文章 |
+| POST | `/api/v1/admin/agent/writing` | 编辑器写作、解释、优化和续写候选，不保存文章 |
+| POST | `/api/v1/admin/agent/writing/stream` | 同一写作任务的 SSE 增量输出，用于编辑器原位审阅 |
 
 文章、分类、标签及搜索列表使用 `page`（默认 1）和 `per_page`（默认 20，最多 50），响应包含 `items`、`page`、`per_page`、`total`。新文章正文提交 `document: { "type": "markdown", "source": "## 标题\n正文" }`；已有 Tiptap JSON 文档仍可读取和更新。公开详情返回服务端生成并净化的 `rendered_html`，不接受前端直接提交 HTML。匿名评论需提交 `nickname`、`email`、`body`，可选 `parent_public_id`；新评论先进入 `pending` 状态，公开接口不返回邮箱。错误统一为 `{ "code": "...", "message": "..." }`，前端应按 `code` 处理；精确请求体、状态码与字段以 OpenAPI 为准。
 
@@ -82,6 +85,12 @@ STORAGE_MY_OSS_SECRET_KEY=...
 
 ## Agent 与外链
 
-Agent 提供商配置独立于公开站点设置。`adapter` 可为 `openai_compatible` 或 `jimeng`，`capability` 为 `text` 或 `image`，`model_id` 填提供商真实模型 ID。创建时需提供 `api_key`，更新时留空保留原值。绑定任务时服务端校验模型已启用且能力匹配。此阶段实现模型注册和任务路由，模型请求、Skill/MCP 安装、工具调用与图像生成任务尚未开放执行接口，不能把配置完成视为已可生图。
+Agent 提供商配置独立于公开站点设置。`adapter` 可为 `openai_compatible` 或 `jimeng`，`capability` 为 `text` 或 `image`，`model_id` 填提供商真实模型 ID。创建时需提供 `api_key`，更新时留空保留原值。绑定任务时服务端校验模型已启用且能力匹配。当前摘要与文章写作任务已开放模型执行接口；Skill/MCP 安装、工具调用与图像生成任务尚未开放，不能把配置完成视为已可生图。
+
+摘要任务已通过 Rig 接入文本模型。管理员发送 `POST /api/v1/admin/agent/summary`，请求体为 `{ "title": "文章标题", "source": "Markdown 正文" }`，携带会话 Cookie 与 `X-CSRF-Token`，响应 `{ "summary": "候选摘要" }`。正文最长 50000 字符，输出最长 500 字符；接口不修改文章或修订。优先使用 `summary` 任务绑定；未绑定且恰好只有一个已启用、已配置密钥的文本模型时使用该模型。官方 DeepSeek 地址走 Rig DeepSeek 适配器，其余 OpenAI 兼容地址走 Chat Completions。模型错误或超时返回 `502 summary_generation_failed`，无可用模型返回 `409 summary_model_unavailable`。后台发布面板需明确点击“采用摘要”后才写入编辑状态。
+
+写作任务使用同一管理员会话与 CSRF 保护。`POST /api/v1/admin/agent/writing` 请求体为 `{ "action": "improve", "instruction": "更简洁", "selected": "选中文字", "before": "前文", "after": "后文" }`；`action` 可为 `draft`、`explain`、`improve`、`continue`，响应 `{ "content": "候选 Markdown" }`。`draft` 需要非空指令，其余动作需要非空选区；指令最多 1000 字符，选区最多 12000 字符，前后文各最多 6000 字符，候选最多 20000 字符。优先使用 `writing` 任务绑定；没有可用模型返回 `409 writing_model_unavailable`，模型调用失败返回 `502 writing_generation_failed`。接口只返回候选，编辑器在确认文档未变化后以单次可撤销事务写入。
+
+编辑器使用 `POST /api/v1/admin/agent/writing/stream`，请求体和鉴权与普通写作接口相同，成功响应为 `text/event-stream`。`event: delta` 的 JSON 数据为 `{ "content": "增量" }`；`event: done` 返回经过服务端校验的完整候选，只有收到此事件后才能采纳；`event: error` 返回 `{ "message": "错误说明" }`。连接中断或管理员关闭助手后取消客户端读取，正文保持不变。流式调用过程中的错误通过 `error` 事件报告，因此连接已建立后 HTTP 状态仍为 200。
 
 正文中写普通 Markdown 链接即可：`[网页标题](https://example.com/article)`。服务端渲染器继续净化 URL；前台与编辑器右侧共用外链增强，自动补 favicon，鼠标或键盘聚焦时请求网页预览。触屏设备保持普通可点击链接。抓取仅允许公网 HTTP(S)，禁止重定向，限制响应大小和耗时，Redis 缓存一天；目标网页拒绝抓取或没有 Open Graph 图片时只显示可取得的文字信息。
