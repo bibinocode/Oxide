@@ -1,0 +1,302 @@
+.markdown-editor {
+  background: #fff;
+}
+.markdown-commandbar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 12px;
+  min-height: 68px;
+  border-bottom: 1px solid #e4e7eb;
+  padding: 10px 22px;
+}
+.markdown-back,
+.markdown-settings-button {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: #65707b;
+}
+.markdown-back:hover,
+.markdown-settings-button:hover,
+.markdown-settings-button[aria-pressed="true"] {
+  color: var(--page-text);
+  background: #f1f3f5;
+}
+.markdown-title {
+  width: 100%;
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: #313943;
+  font-size: 1.35rem;
+  font-weight: 500;
+}
+.markdown-title:focus-visible {
+  outline: 0;
+}
+.markdown-title::placeholder {
+  color: #99a3ae;
+}
+.markdown-save-status {
+  flex: none;
+  max-width: 280px;
+  overflow: hidden;
+  color: #88929d;
+  font-size: 0.75rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.markdown-commandbar .button-primary,
+.markdown-commandbar .button-secondary {
+  flex: none;
+  padding: 0.48rem 0.8rem;
+  font-size: 0.875rem;
+}
+.markdown-tool-row {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+  border-bottom: 1px solid #e4e7eb;
+  padding: 3px 14px;
+}
+.markdown-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+.markdown-toolbar button {
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: #49525d;
+}
+.markdown-toolbar button:hover {
+  background: #eef1f4;
+}
+.markdown-format-label {
+  color: #a1aab3;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+}
+.markdown-editor .editor-workspace {
+  min-height: 0;
+}
+.markdown-source {
+  overflow: hidden;
+  background: #f7f8fa;
+}
+.markdown-source > div,
+.markdown-source .cm-editor {
+  height: 100%;
+}
+.markdown-source .cm-editor {
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  line-height: 1.8;
+}
+.markdown-source .cm-editor.cm-focused {
+  outline: none;
+}
+.markdown-source .cm-scroller {
+  padding: 28px 32px 90px;
+  font-family: inherit;
+}
+.markdown-source .cm-content {
+  min-height: 100%;
+  padding: 0;
+}
+.markdown-source .cm-line {
+  padding: 0;
+}
+.markdown-editor .editor-preview-pane {
+  border-left-color: #e4e7eb;
+  background: #fff;
+}
+.markdown-editor .editor-preview-content {
+  padding-top: 54px;
+}
+.markdown-statusbar {
+  display: flex;
+  min-height: 27px;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid #e4e7eb;
+  padding: 3px 14px;
+  color: #87919a;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+}
+.markdown-settings-layer {
+  position: fixed;
+  z-index: 120;
+  inset: 0;
+}
+.markdown-settings-scrim {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  border: 0;
+  background: rgb(24 31 39 / 28%);
+}
+.markdown-settings-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  width: min(380px, 100%);
+  flex-direction: column;
+  gap: 24px;
+  overflow-y: auto;
+  background: #fff;
+  padding: 24px;
+  box-shadow: -10px 0 30px rgb(24 31 39 / 9%);
+}
+.markdown-editor .editor-view-switch {
+  margin: 8px 14px;
+}
+.prose-blog hr {
+  margin: 2rem 0;
+  border: 0;
+  border-top: 1px solid var(--page-line);
+}
+.prose-blog code:not(pre code) {
+  border-radius: 2px;
+  background: #edf0f2;
+  padding: 0.1em 0.3em;
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+.prose-blog table {
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+.prose-blog th,
+.prose-blog td {
+  border: 1px solid var(--page-line);
+  padding: 0.35rem 0.65rem;
+  text-align: left;
+}
+.prose-blog ul,
+.prose-blog ol {
+  padding-left: 1.5rem;
+}
+.prose-blog pre.shiki {
+  border: 1px solid #e4e7eb;
+  background: #f7f8fa !important;
+  color: #24292f !important;
+}
+.article-editor-shell {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+}
+.editor-commandbar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  min-height: 78px;
+  border-bottom: 1px solid var(--page-line);
+  padding: 12px 24px;
+}
+.editor-status {
+  min-height: 27px;
+  flex: none;
+  border-bottom: 1px solid var(--page-line);
+  padding: 4px 24px;
+  color: var(--page-subtle);
+  font-size: 0.75rem;
+}
+.editor-workspace {
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+.editor-pane {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+.editor-preview-pane {
+  position: relative;
+  isolation: isolate;
+  border-left: 1px solid var(--page-line);
+  background: var(--page-bg);
+}
+.editor-pane-heading {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  height: 38px;
+  border-bottom: 1px solid var(--page-line);
+  background: var(--color-paper);
+  padding: 10px 24px;
+  color: var(--page-subtle);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+}
+.editor-edit-content {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  padding: 24px 28px 80px;
+}
+.editor-document {
+  border: 1px solid var(--page-line);
+  background: var(--page-bg);
+}
+.editor-document:focus-within {
+  border-color: var(--page-accent);
+}
+.editor-canvas {
+  min-height: 460px;
+  padding: 12px 28px 28px;
+}
+.editor-canvas .tiptap:focus-visible {
+  outline: none;
+}
+.editor-preview-content {
+  position: relative;
+  z-index: 1;
+  width: min(calc(100% - 64px), var(--page-content-width));
+  margin-inline: auto;
+  padding: 54px 0 100px;
+}
+.editor-view-switch {
+  display: none;
+  border: 1px solid var(--page-line);
+  border-radius: 3px;
+  padding: 2px;
+}
+.editor-view-switch button {
+  min-width: 64px;
+  padding: 6px 10px;
+  color: var(--page-subtle);
+  font-size: 0.8125rem;
+}
+.editor-view-switch button[aria-pressed="true"] {
+  background: var(--page-text);
+  color: white;
+}

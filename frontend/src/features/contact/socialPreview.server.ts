@@ -1,74 +1,14 @@
 import { load } from "cheerio";
 import { ProxyAgent, fetch as outboundFetch } from "undici";
 import type { SocialPreviewData } from "./socialPreview";
+import { parseProfile } from "./profile.ts";
+import type { Profile } from "./profile.ts";
 
-type Service = "github" | "x" | "youtube" | "telegram";
-type Profile = { service: Service; handle: string; url: string };
-type ProfileRule = {
-  service: Service;
-  hosts: readonly string[];
-  canonicalHost: string;
-  path: RegExp;
-};
-
-/** 平台规则集中维护；正则的第一组必须捕获规范账号路径。 */
-const PROFILE_RULES: readonly ProfileRule[] = [
-  {
-    service: "github",
-    hosts: ["github.com"],
-    canonicalHost: "github.com",
-    path: /^\/([a-zA-Z0-9](?:[a-zA-Z0-9-]{0,37}[a-zA-Z0-9])?)\/?$/,
-  },
-  {
-    service: "x",
-    hosts: ["x.com", "twitter.com"],
-    canonicalHost: "x.com",
-    path: /^\/([a-zA-Z0-9_]{1,15})\/?$/,
-  },
-  {
-    service: "youtube",
-    hosts: ["youtube.com"],
-    canonicalHost: "www.youtube.com",
-    path: /^\/(@[a-zA-Z0-9._-]{3,30})\/?$/,
-  },
-  {
-    service: "youtube",
-    hosts: ["youtube.com"],
-    canonicalHost: "www.youtube.com",
-    path: /^\/((?:channel|c|user)\/[a-zA-Z0-9_-]{1,80})\/?$/,
-  },
-  {
-    service: "telegram",
-    hosts: ["t.me", "telegram.me"],
-    canonicalHost: "t.me",
-    path: /^\/([a-zA-Z0-9_]{5,32})\/?$/,
-  },
-];
+export { parseProfile } from "./profile.ts";
 
 const cache = new Map<string, { expires: number; value: SocialPreviewData | null }>();
 const proxyUrl = process.env.HTTPS_PROXY ?? process.env.https_proxy;
 const dispatcher = proxyUrl ? new ProxyAgent(proxyUrl) : undefined;
-
-/** 限定平台域名与个人主页路径，避免将服务端请求转发到任意地址。 */
-export function parseProfile(input: string): Profile | null {
-  if (input.length > 2048) return null;
-  let url: URL;
-  try {
-    url = new URL(input);
-  } catch {
-    return null;
-  }
-  if (url.protocol !== "https:" || url.port || url.username || url.password) return null;
-  const host = url.hostname.toLowerCase().replace(/^www\./, "");
-  const rule = PROFILE_RULES.find(
-    (candidate) => candidate.hosts.includes(host) && candidate.path.test(url.pathname),
-  );
-  if (!rule) return null;
-  const handle = rule.path.exec(url.pathname)?.[1];
-  return handle
-    ? { service: rule.service, handle, url: `https://${rule.canonicalHost}/${handle}` }
-    : null;
-}
 
 function text(value: unknown, maxLength = 500): string | undefined {
   return typeof value === "string" ? value.trim().slice(0, maxLength) || undefined : undefined;

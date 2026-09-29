@@ -30,6 +30,8 @@ Axum 0.8.9 默认监听 `127.0.0.1:3001`。TanStack Start 开发服务监听 `12
 | POST | `/api/v1/admin/login`、`/api/v1/admin/logout` | 登录和退出 |
 | GET | `/api/v1/admin/session` | 当前会话与 CSRF 令牌 |
 | GET、POST | `/api/v1/admin/articles` | 管理文章列表、创建草稿 |
+| GET | `/api/v1/admin/notion/pages?q=标题&cursor=...` | 搜索已共享给集成的 Notion 页面；返回 `items` 与 `next_cursor` |
+| POST | `/api/v1/admin/notion/pages/{page_id}/sync` | 导入或同步文章，JSON 请求体 `{ "force": false }` |
 | GET、PUT、DELETE | `/api/v1/admin/articles/{public_id}` | 读取、编辑、删除文章 |
 | POST | `/api/v1/admin/articles/{public_id}/publish`、`/unpublish` | 发布与撤回 |
 | GET | `/api/v1/admin/articles/{public_id}/revisions` | 修订历史 |
@@ -42,7 +44,7 @@ Axum 0.8.9 默认监听 `127.0.0.1:3001`。TanStack Start 开发服务监听 `12
 | POST | `/api/v1/admin/categories`、`/api/v1/admin/tags` | 创建分类、标签 |
 | PUT、DELETE | `/api/v1/admin/categories/{slug}`、`/api/v1/admin/tags/{slug}` | 修改、删除分类或标签 |
 | GET、POST | `/api/v1/admin/storage-providers` | 列出、创建 OSS/Kodo 提供商 |
-| PUT、DELETE | `/api/v1/admin/storage-providers/{id}` | 修改、删除提供商 |
+| PUT、DELETE | `/api/v1/admin/storage-providers/{id}` | 修改、删除提供商；有素材引用时返回 409，删除当前上传源会同步清空上传源设置 |
 | POST | `/api/v1/admin/storage-providers/{id}/activate` | 切换新上传使用的提供商 |
 | GET、POST | `/api/v1/admin/assets` | 素材列表、图片上传 |
 | PATCH、DELETE | `/api/v1/admin/assets/{public_id}` | 素材公开状态、删除 |
@@ -56,15 +58,17 @@ Axum 0.8.9 默认监听 `127.0.0.1:3001`。TanStack Start 开发服务监听 `12
 
 管理员接口使用 `HttpOnly` 会话 Cookie。登录或读取会话后，所有写请求携带响应中的 `csrf_token`，请求头名为 `X-CSRF-Token`。浏览器通过同源路径发送请求。
 
+Notion 同步仅供管理员手动执行。后端配置 `NOTION_API_KEY` 后，在 Notion 中将文章页面共享给集成；进入后台“Notion 导入”搜索并导入。首次导入创建草稿；以后按 Notion 页面 ID 更新同一篇文章，保留本站 UUID、slug、发布状态，并将旧正文写入修订历史。若本站正文在上次同步后有修改，返回 `409 notion_local_changes`；确认后使用 `{ "force": true }` 覆盖。响应含 `outcome`（`created`、`updated`、`unchanged`）、`article` 与 `warnings`。当前同步覆盖标题、摘要和正文，不同步分类、标签及封面。Notion 托管图片转存到当前启用的 OSS，需先在后台配置上传源；不支持的块在 `warnings` 中提示。单篇上限 500 个块、6 层嵌套和 30 张图片。
+
 文章详情新增 `cover_url`，为空时不渲染主图占位。后台主图响应为 `asset_public_id` 和 `media_url`，不返回素材内部 ID。新草稿无需用户填写 slug，编辑器先生成稳定临时地址，发布面板可修改。
 
-`presentation` 包含 `footer_text`、`contacts`、`projects`、`services`。后三者结构为 `{ "enabled": false, "items": [{ "title": "名称", "url": "https://example.com", "description": "说明", "avatar_url": "https://example.com/avatar.jpg", "stat_text": "128 位订阅者" }] }`。`avatar_url` 和 `stat_text` 可选，用于联系方式悬停卡片；旧配置无需迁移。关闭模块保留条目，数组顺序即展示顺序。保存站点时省略 `presentation` 将保留旧值；不在此对象保存私密 AI 或 OSS 配置。数据库需应用 `m20260928_000003_site_presentation` 迁移。
+`presentation` 包含 `home_intro`、`footer_text`、`contacts`、`projects`、`services`。`home_intro` 为 `{ "enabled": false, "body": "介绍 [GitHub](https://github.com/example)", "portrait_url": "/media/{uuid}", "portrait_alt": "个人肖像", "xiaohongshu": { "url": "", "name": "", "handle": "", "bio": "", "followers": "", "likes": "" } }`；肖像必须是已公开的本站图片素材，正文最多 2000 字。`body` 使用 Markdown 存储，后台提供所见即所得编辑；首页支持段落、粗体、斜体和链接。GitHub、X、YouTube、Telegram、小红书个人主页及 `mailto:` 链接显示平台卡片；普通 HTTPS 链接显示网页预览。`xiaohongshu` 为站长维护的公开资料快照，只有 `url` 与正文中的小红书个人主页链接匹配时才显示姓名、账号、简介、粉丝和获赞收藏数，头像使用首页肖像；空 `url` 时其余字段也必须为空。小红书分享链接保存时移除临时跟踪参数；未配置资料且平台拒绝抓取时，卡片显示链接文字与平台标识。后三者结构为 `{ "enabled": false, "items": [{ "title": "名称", "url": "https://example.com", "description": "说明", "avatar_url": "https://example.com/avatar.jpg", "stat_text": "128 位订阅者" }] }`。`avatar_url` 和 `stat_text` 可选，用于联系方式悬停卡片；旧配置无需迁移。关闭模块保留条目，数组顺序即展示顺序。保存站点时省略 `presentation` 将保留旧值；不在此对象保存私密 AI 或 OSS 配置。数据库需应用 `m20260928_000003_site_presentation` 迁移。
 
 ## 搜索与素材
 
 搜索索引保存在 `SEARCH_INDEX_DIR`。发布、撤回、编辑文章后由后台任务同步；更换索引目录或需要全量修复时，停止 API 进程并运行 `cargo run --bin rust-Oxide -- --reindex`，随后重启 API。索引可从 PostgreSQL 重建。
 
-在管理端创建提供商时，`id` 使用 2 至 40 位大写字母、数字或下划线，`kind` 为 `aliyun_oss` 或 `qiniu_kodo`。后台可直接填写 HTTPS `endpoint`、`bucket`、`region`、`access_key` 和 `secret_key`。七牛填写对应区域的 S3 兼容端点，公开域名填绑定的 CDN 域名。保存后在素材存储列表将其设为当前上传源，然后到素材库上传。更新时 AK/SK 同时留空表示保留现有凭据；响应仅返回 `credentials_configured`，不返回密钥。旧环境变量仍兼容，例如 ID 为 `MY_OSS` 时：
+在管理端创建提供商时，`id` 使用 2 至 40 位大写字母、数字或下划线，`kind` 为 `aliyun_oss` 或 `qiniu_kodo`。后台填写空间 `bucket`、`access_key` 和 `secret_key`；阿里云还需填写 HTTPS `endpoint` 与 `region`。七牛上传、下载和删除使用官方 SDK，S3 端点与区域可留空；公开域名填绑定的 HTTPS CDN 域名，私有空间由服务端签名下载。保存后在素材存储列表将其设为当前上传源，然后到素材库上传。更新时 AK/SK 同时留空表示保留现有凭据；响应仅返回 `credentials_configured`，不返回密钥。旧环境变量仍兼容，例如 ID 为 `MY_OSS` 时：
 
 ```text
 STORAGE_MY_OSS_ENDPOINT=https://oss-cn-hangzhou.aliyuncs.com

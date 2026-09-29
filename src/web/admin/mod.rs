@@ -5,6 +5,7 @@ pub mod auth;
 pub mod comments;
 pub mod content;
 pub mod cover;
+pub mod notion;
 pub mod preview;
 pub mod settings;
 pub mod storage;

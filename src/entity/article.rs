@@ -1,7 +1,7 @@
 //! 文章正文、发布状态和公开地址。
 
-use sea_orm::Set;
 use sea_orm::entity::prelude::*;
+use sea_orm::{NotSet, Set};
 
 use super::status::ArticleStatus;
 
@@ -41,6 +41,13 @@ pub struct Model {
     pub created_at: DateTimeUtc,
     /// 最近一次编辑时间。
     pub updated_at: DateTimeUtc,
+    /// 已导入的 Notion 页面标识；每页最多对应一篇文章。
+    #[sea_orm(unique)]
+    pub notion_page_id: Option<Uuid>,
+    /// 上次成功同步时 Notion 页面的编辑时间。
+    pub notion_last_edited_at: Option<DateTimeUtc>,
+    /// 上次成功同步到本站的时间，用于检测后续本地编辑。
+    pub notion_synced_at: Option<DateTimeUtc>,
     /// 封面素材的可选关联。
     #[sea_orm(belongs_to, from = "cover_asset_id", to = "id")]
     pub cover_asset: BelongsTo<Option<super::asset::Entity>>,
@@ -63,8 +70,21 @@ impl ActiveModelBehavior for ActiveModel {
     /// 新建文章时自动生成不可预测的外部标识。
     fn new() -> Self {
         Self {
+            id: NotSet,
             public_id: Set(Uuid::new_v4()),
-            ..Default::default()
+            slug: NotSet,
+            title: NotSet,
+            summary: NotSet,
+            document: NotSet,
+            rendered_html: NotSet,
+            status: NotSet,
+            cover_asset_id: NotSet,
+            published_at: NotSet,
+            created_at: NotSet,
+            updated_at: NotSet,
+            notion_page_id: NotSet,
+            notion_last_edited_at: NotSet,
+            notion_synced_at: NotSet,
         }
     }
 
@@ -77,5 +97,18 @@ impl ActiveModelBehavior for ActiveModel {
             self.public_id = Set(Uuid::new_v4());
         }
         Ok(self)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 新文章的默认模型可安全构造且公开 ID 不可预测。
+    #[test]
+    fn default_article_has_public_uuid() {
+        let first: ActiveModel = Default::default();
+        let second: ActiveModel = Default::default();
+        assert_ne!(first.public_id.unwrap(), second.public_id.unwrap());
     }
 }

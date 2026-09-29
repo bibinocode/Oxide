@@ -28,9 +28,10 @@ infer = "0.22"
 jieba-rs = "0.11"
 object_store = { version = "0.14", default-features = false, features = ["aws"] }
 pulldown-cmark = "0.13"
+qiniu-sdk = { version = "=0.2.4", default-features = false, features = ["objects", "upload", "download", "ureq"] }
 rand_core = { version = "0.6", features = ["getrandom"] }
 redis = { version = "1.0", features = ["tokio-comp"] }
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "stream"] }
 rss = "2"
 sea-orm = { version = "=2.0.4", default-features = false, features = ["macros", "with-chrono", "with-json", "with-uuid", "sqlx-postgres", "runtime-tokio-rustls"] }
 serde = { version = "1", features = ["derive"] }
@@ -48,5 +49,4 @@ url = "2"
 uuid = { version = "1", features = ["v4"] }
 
 [dev-dependencies]
-qiniu-sdk = { version = "=0.2.4", default-features = false, features = ["objects", "ureq"] }
 tower = { version = "0.5", features = ["util"] }

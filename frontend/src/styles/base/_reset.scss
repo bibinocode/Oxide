@@ -1,0 +1,113 @@
+html {
+  background: var(--page-bg);
+  color: var(--page-text);
+}
+body {
+  margin: 0;
+  min-width: 320px;
+  -webkit-font-smoothing: antialiased;
+  isolation: isolate;
+}
+* {
+  box-sizing: border-box;
+}
+a {
+  color: inherit;
+  text-decoration: none;
+}
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+button {
+  cursor: pointer;
+}
+:focus-visible {
+  outline: 1px solid var(--page-accent);
+  outline-offset: 3px;
+}
+::selection {
+  background: #dce8ad;
+}
+.theme-control {
+  display: inline-flex;
+  gap: 2px;
+  margin-top: 18px;
+  padding: 3px;
+  border: 1px solid var(--page-line);
+  border-radius: 4px;
+}
+.theme-control button {
+  display: grid;
+  width: 27px;
+  height: 27px;
+  place-items: center;
+  border-radius: 2px;
+  color: var(--page-subtle);
+}
+.theme-control button[aria-pressed="true"] {
+  background: var(--page-paper);
+  color: var(--page-text);
+}
+.theme-control-compact {
+  margin-top: 0;
+  flex: none;
+}
+:root[data-theme="dark"] .column-guides {
+  border-color: var(--page-line);
+}
+:root[data-theme="dark"] .pixel-mark i {
+  background: var(--page-subtle);
+}
+:root[data-theme="dark"] .site-dock {
+  border-color: var(--page-line);
+  background: rgb(37 42 41 / 92%);
+  box-shadow: 0 7px 24px rgb(0 0 0 / 25%);
+}
+:root[data-theme="dark"] .site-dock a:hover,
+:root[data-theme="dark"] .site-dock a[data-status="active"] {
+  background: #38403b;
+  color: var(--page-text);
+}
+:root[data-theme="dark"] .catalog-row-leader {
+  background-image: radial-gradient(circle, var(--page-subtle) 0.5px, transparent 0.5px);
+}
+:root[data-theme="dark"] .markdown-source .cm-editor {
+  background: var(--page-paper);
+  color: var(--page-text);
+}
+:root[data-theme="dark"] .markdown-source .cm-gutters {
+  background: var(--page-paper);
+  color: var(--page-subtle);
+  border-color: var(--page-line);
+}
+:root[data-theme="dark"] .markdown-source .cm-cursor {
+  border-left-color: var(--page-text);
+}
+:root[data-theme="dark"] .markdown-source .cm-selectionBackground {
+  background: #4d6258;
+}
+:root[data-theme="dark"] .article-reader .article-prose pre.shiki,
+:root[data-theme="dark"] .prose-blog pre.shiki {
+  background: #242b28 !important;
+  color: var(--page-text) !important;
+  border-color: var(--page-line);
+}
+:root[data-theme="dark"] .shiki span {
+  color: var(--shiki-dark) !important;
+}
+:root[data-theme="dark"] .skeleton-line {
+  background-image: linear-gradient(90deg, #303733, #414a43, #303733);
+}
+:root[data-theme="dark"] .button-primary {
+  color: var(--page-bg);
+}
+:root[data-theme="dark"] .button-primary:hover {
+  background: #b9c9b9;
+}
+:root[data-theme="dark"] ::selection {
+  background: #465e4a;
+  color: var(--page-text);
+}

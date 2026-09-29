@@ -60,6 +60,7 @@ async fn main() -> Result<()> {
         session_secure: config.session_secure,
         public_base_url: Arc::from(config.public_base_url),
         search: search.clone(),
+        notion_api_key: config.notion_api_key.map(Arc::from),
     };
 
     let listener = tokio::net::TcpListener::bind(config.bind)

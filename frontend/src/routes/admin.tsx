@@ -1,6 +1,14 @@
 import { Link, Outlet, createFileRoute, useRouterState } from "@tanstack/react-router";
 import { useState } from "react";
-import { ArrowUpRight, FileText, Images, LogOut, MessageSquare, Settings } from "lucide-react";
+import {
+  ArrowUpRight,
+  FileText,
+  Images,
+  LogOut,
+  MessageSquare,
+  Settings,
+  BookOpen,
+} from "lucide-react";
 import { AdminSessionProvider, csrfHeaders, useAdminSession } from "../features/admin/AdminSession";
 import { apiRequest } from "../lib/api/client";
 import type { Session } from "../lib/api/types";
@@ -117,6 +125,9 @@ function AdminLayout() {
           </Link>
           <Link to="/admin/comments" activeProps={{ className: "is-active" }}>
             <MessageSquare size={17} /> 评论
+          </Link>
+          <Link to="/admin/notion" activeProps={{ className: "is-active" }}>
+            <BookOpen size={17} /> Notion 导入
           </Link>
           <Link to="/admin/assets" activeProps={{ className: "is-active" }}>
             <Images size={17} /> 素材

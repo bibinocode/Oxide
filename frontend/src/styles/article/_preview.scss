@@ -1,0 +1,44 @@
+.prose-blog {
+  color: var(--page-text);
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  line-height: 1.9;
+  overflow-wrap: anywhere;
+}
+.prose-blog h2,
+.prose-blog h3,
+.prose-blog h4 {
+  margin-top: 2.2em;
+  margin-bottom: 0.6em;
+  font-family: var(--font-sans);
+  line-height: 1.4;
+}
+.prose-blog p {
+  margin: 1.2em 0;
+}
+.prose-blog a {
+  color: var(--page-accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.prose-blog img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+}
+.prose-blog pre {
+  overflow: auto;
+  padding: 1.1rem;
+  border-radius: 4px;
+  background: #302e2b;
+  color: #f5f3ee;
+  font:
+    0.9rem/1.7 ui-monospace,
+    monospace;
+}
+.prose-blog blockquote {
+  margin-inline: 0;
+  padding-left: 1.25rem;
+  border-left: 3px solid var(--page-accent);
+  color: var(--page-subtle);
+}

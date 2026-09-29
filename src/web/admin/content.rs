@@ -67,6 +67,10 @@ pub struct AdminArticleResponse {
     pub published_at: Option<DateTime<Utc>>,
     /// 最后更新时间。
     pub updated_at: DateTime<Utc>,
+    /// Notion 来源页；本站创建的文章为空。
+    pub notion_page_id: Option<Uuid>,
+    /// Notion 页面上次同步的编辑时间。
+    pub notion_last_edited_at: Option<DateTime<Utc>>,
 }
 
 impl From<article::Model> for AdminArticleResponse {
@@ -84,6 +88,8 @@ impl From<article::Model> for AdminArticleResponse {
             document: row.document,
             published_at: row.published_at,
             updated_at: row.updated_at,
+            notion_page_id: row.notion_page_id,
+            notion_last_edited_at: row.notion_last_edited_at,
         }
     }
 }
@@ -225,6 +231,9 @@ pub async fn create(
         published_at: Set(None),
         created_at: Set(now),
         updated_at: Set(now),
+        notion_page_id: Set(None),
+        notion_last_edited_at: Set(None),
+        notion_synced_at: Set(None),
     };
     match model.insert(&state.db).await {
         Ok(row) => (StatusCode::CREATED, Json(AdminArticleResponse::from(row))).into_response(),
@@ -401,7 +410,7 @@ async fn change_status(
 }
 
 /// 在文章事务中写入可恢复的索引更新任务。
-async fn enqueue(
+pub(super) async fn enqueue(
     txn: &sea_orm::DatabaseTransaction,
     article_id: i64,
     action: SearchAction,

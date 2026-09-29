@@ -17,6 +17,7 @@ import { Route as SearchRouteImport } from './routes/search'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminAssetsRouteImport } from './routes/admin.assets'
 import { Route as AdminCommentsRouteImport } from './routes/admin.comments'
+import { Route as AdminNotionRouteImport } from './routes/admin.notion'
 import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as ArticlesSlugRouteImport } from './routes/articles.$slug'
 import { Route as CategoriesSlugRouteImport } from './routes/categories.$slug'
@@ -64,6 +65,11 @@ const AdminCommentsRoute = AdminCommentsRouteImport.update({
   path: '/comments',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminNotionRoute = AdminNotionRouteImport.update({
+  id: '/notion',
+  path: '/notion',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminSettingsRoute = AdminSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -103,6 +109,7 @@ export interface FileRoutesByFullPath {
   '/search': typeof SearchRoute
   '/admin/assets': typeof AdminAssetsRoute
   '/admin/comments': typeof AdminCommentsRoute
+  '/admin/notion': typeof AdminNotionRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/articles/$slug': typeof ArticlesSlugRoute
   '/categories/$slug': typeof CategoriesSlugRoute
@@ -118,6 +125,7 @@ export interface FileRoutesByTo {
   '/search': typeof SearchRoute
   '/admin/assets': typeof AdminAssetsRoute
   '/admin/comments': typeof AdminCommentsRoute
+  '/admin/notion': typeof AdminNotionRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/articles/$slug': typeof ArticlesSlugRoute
   '/categories/$slug': typeof CategoriesSlugRoute
@@ -135,6 +143,7 @@ export interface FileRoutesById {
   '/search': typeof SearchRoute
   '/admin/assets': typeof AdminAssetsRoute
   '/admin/comments': typeof AdminCommentsRoute
+  '/admin/notion': typeof AdminNotionRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/articles/$slug': typeof ArticlesSlugRoute
   '/categories/$slug': typeof CategoriesSlugRoute
@@ -153,6 +162,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/admin/assets'
     | '/admin/comments'
+    | '/admin/notion'
     | '/admin/settings'
     | '/articles/$slug'
     | '/categories/$slug'
@@ -168,6 +178,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/admin/assets'
     | '/admin/comments'
+    | '/admin/notion'
     | '/admin/settings'
     | '/articles/$slug'
     | '/categories/$slug'
@@ -184,6 +195,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/admin/assets'
     | '/admin/comments'
+    | '/admin/notion'
     | '/admin/settings'
     | '/articles/$slug'
     | '/categories/$slug'
@@ -262,6 +274,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminCommentsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/notion': {
+      id: '/admin/notion'
+      path: '/notion'
+      fullPath: '/admin/notion'
+      preLoaderRoute: typeof AdminNotionRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/settings': {
       id: '/admin/settings'
       path: '/settings'
@@ -310,6 +329,7 @@ declare module '@tanstack/react-router' {
 interface AdminRouteChildren {
   AdminAssetsRoute: typeof AdminAssetsRoute
   AdminCommentsRoute: typeof AdminCommentsRoute
+  AdminNotionRoute: typeof AdminNotionRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminArticlesPublicIdRoute: typeof AdminArticlesPublicIdRoute
@@ -319,6 +339,7 @@ interface AdminRouteChildren {
 const AdminRouteChildren: AdminRouteChildren = {
   AdminAssetsRoute: AdminAssetsRoute,
   AdminCommentsRoute: AdminCommentsRoute,
+  AdminNotionRoute: AdminNotionRoute,
   AdminSettingsRoute: AdminSettingsRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminArticlesPublicIdRoute: AdminArticlesPublicIdRoute,

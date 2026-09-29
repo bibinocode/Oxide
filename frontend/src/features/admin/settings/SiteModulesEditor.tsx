@@ -1,5 +1,5 @@
 import { Plus, Trash2 } from "lucide-react";
-import type { SitePresentation, SiteSection } from "../../lib/api/types";
+import type { SitePresentation, SiteSection } from "../../../lib/api/types";
 
 /** 公开模块使用结构化表单维护，开关与内容分别保存。 */
 export function SiteModulesEditor({

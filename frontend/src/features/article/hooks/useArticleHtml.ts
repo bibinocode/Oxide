@@ -36,12 +36,31 @@ function getHighlighter() {
 export function useArticleHtml(html: string) {
   const [enhanced, setEnhanced] = useState({ source: "", html: "" });
   useEffect(() => {
-    if (!html.includes("<pre")) return;
+    if (!html.includes("<img") && !html.includes("<pre")) return;
     let cancelled = false;
-    getHighlighter()
-      .then((highlighter) => {
+    const document = new DOMParser().parseFromString(html, "text/html");
+    for (const image of document.querySelectorAll<HTMLImageElement>("img")) {
+      if (image.closest("figure")) continue;
+      const parent = image.parentElement;
+      if (
+        !parent ||
+        parent.tagName !== "P" ||
+        parent.children.length !== 1 ||
+        parent.textContent?.trim()
+      )
+        continue;
+      const caption = image.alt.trim() || "图片";
+      const figure = document.createElement("figure");
+      figure.className = "article-image";
+      const label = document.createElement("figcaption");
+      label.textContent = caption;
+      figure.append(image, label);
+      parent.replaceWith(figure);
+    }
+    async function enhance() {
+      if (html.includes("<pre")) {
+        const highlighter = await getHighlighter();
         if (cancelled) return;
-        const document = new DOMParser().parseFromString(html, "text/html");
         for (const code of document.querySelectorAll("pre > code")) {
           const language =
             [...code.classList].find((name) => name.startsWith("language-"))?.slice(9) ?? "text";
@@ -66,11 +85,13 @@ export function useArticleHtml(html: string) {
           frame.append(...codeHtml.childNodes);
           code.parentElement?.replaceWith(frame);
         }
-        if (!cancelled) setEnhanced({ source: html, html: document.body.innerHTML });
-      })
-      .catch(() => {
-        /* 高亮加载失败时保留服务端提供的完整可读代码。 */
-      });
+      }
+      if (!cancelled) setEnhanced({ source: html, html: document.body.innerHTML });
+    }
+    void enhance().catch(() => {
+      /* 高亮加载失败时仍保留图片标注和服务端提供的代码。 */
+      if (!cancelled) setEnhanced({ source: html, html: document.body.innerHTML });
+    });
     return () => {
       cancelled = true;
     };

@@ -9,6 +9,8 @@ import { ContentSkeleton } from "../components/layout/ContentSkeleton";
 export const Route = createFileRoute("/articles/$slug")({
   loader: ({ params }) => getArticleData({ data: params.slug }),
   pendingComponent: () => <ContentSkeleton article />,
+  pendingMs: 0,
+  pendingMinMs: 300,
   head: ({ loaderData }) => ({
     meta: [
       { title: loaderData ? `${loaderData.article.title} · Oxide` : "文章 · Oxide" },

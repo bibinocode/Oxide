@@ -1,9 +1,18 @@
 //! 阿里云 OSS 与七牛 Kodo 的 S3 兼容对象存储适配器。
 
-use std::{env, sync::Arc};
+use std::{env, io::Cursor, sync::Arc, time::Duration};
 
 use anyhow::{Context, Result, bail};
-use object_store::{ObjectStore, aws::AmazonS3Builder};
+use axum::body::Bytes;
+use object_store::{ObjectStore, ObjectStoreExt, aws::AmazonS3Builder, path::Path};
+use qiniu_sdk::{
+    download::{DownloadManager, StaticDomainsUrlsGenerator, UrlsSigner},
+    objects::{ObjectsManager, apis::credential::Credential},
+    upload::{
+        ObjectParams, SinglePartUploader, UploadManager, UploadTokenSigner,
+        apis::http_client::mime::Mime,
+    },
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -36,7 +45,38 @@ fn decrypt_credentials(value: &str, server_key: &str) -> Result<Credentials> {
     )?)?)
 }
 
-/// 为阿里云 OSS 或七牛 Kodo 构建 S3 兼容客户端。
+/// 从加密配置或旧环境变量读取密钥，不向 API 和日志暴露内容。
+fn credentials(provider: &storage_provider::Model, server_key: &str) -> Result<Credentials> {
+    match &provider.encrypted_credentials {
+        Some(value) => decrypt_credentials(value, server_key),
+        None => Ok(Credentials {
+            access_key: setting(&provider.id, "ACCESS_KEY")?,
+            secret_key: setting(&provider.id, "SECRET_KEY")?,
+        }),
+    }
+}
+
+/// 七牛原生接口只需要空间名称；S3 端点不参与上传。
+fn qiniu_bucket(provider: &storage_provider::Model) -> Result<String> {
+    provider
+        .bucket
+        .clone()
+        .map(Ok)
+        .unwrap_or_else(|| setting(&provider.id, "BUCKET"))
+}
+
+/// 在保存或启用提供商前检查必要配置。
+pub fn configured(provider: &storage_provider::Model, server_key: &str) -> Result<()> {
+    if provider.kind == StorageProviderKind::QiniuKodo {
+        qiniu_bucket(provider)?;
+        credentials(provider, server_key)?;
+    } else {
+        client(provider, server_key)?;
+    }
+    Ok(())
+}
+
+/// 为阿里云 OSS 构建 S3 兼容客户端。
 pub fn client(
     provider: &storage_provider::Model,
     server_key: &str,
@@ -63,27 +103,106 @@ pub fn client(
         .clone()
         .map(Ok)
         .unwrap_or_else(|| setting(&provider.id, "REGION"))?;
-    let credentials = match &provider.encrypted_credentials {
-        Some(value) => decrypt_credentials(value, server_key)?,
-        None => Credentials {
-            access_key: setting(&provider.id, "ACCESS_KEY")?,
-            secret_key: setting(&provider.id, "SECRET_KEY")?,
-        },
-    };
+    let credentials = credentials(provider, server_key)?;
     if !endpoint.starts_with("https://") {
         bail!("对象存储端点必须使用 HTTPS");
     }
-    let virtual_host = provider.kind == StorageProviderKind::AliyunOss;
     let store = AmazonS3Builder::new()
         .with_endpoint(endpoint)
         .with_bucket_name(bucket)
         .with_region(region)
         .with_access_key_id(credentials.access_key)
         .with_secret_access_key(credentials.secret_key)
-        .with_virtual_hosted_style_request(virtual_host)
+        .with_virtual_hosted_style_request(true)
         .build()
         .context("初始化对象存储客户端失败")?;
     Ok(Arc::new(store))
+}
+
+/// 将图片写入其所属的 OSS；七牛使用官方上传凭证协议。
+pub async fn put(
+    provider: &storage_provider::Model,
+    server_key: &str,
+    key: &str,
+    bytes: Bytes,
+    mime_type: &str,
+) -> Result<()> {
+    if provider.kind == StorageProviderKind::AliyunOss {
+        client(provider, server_key)?
+            .put(&Path::from(key), bytes.into())
+            .await?;
+        return Ok(());
+    }
+    let credentials = credentials(provider, server_key)?;
+    let bucket = qiniu_bucket(provider)?;
+    let key = key.to_owned();
+    let mime_type: Mime = mime_type.parse().context("图片 MIME 类型无效")?;
+    tokio::task::spawn_blocking(move || {
+        let manager = UploadManager::new(UploadTokenSigner::new_credential_provider(
+            Credential::new(credentials.access_key, credentials.secret_key),
+            bucket,
+            Duration::from_secs(3600),
+        ));
+        manager.form_uploader().upload_reader(
+            Cursor::new(bytes),
+            ObjectParams::builder()
+                .object_name(key.as_str())
+                .content_type(mime_type)
+                .build(),
+        )?;
+        Ok::<_, anyhow::Error>(())
+    })
+    .await?
+}
+
+/// 读取图片内容；七牛下载 URL 由官方 SDK 签名，兼容私有空间。
+pub async fn get(provider: &storage_provider::Model, server_key: &str, key: &str) -> Result<Bytes> {
+    if provider.kind == StorageProviderKind::AliyunOss {
+        return Ok(client(provider, server_key)?
+            .get(&Path::from(key))
+            .await?
+            .bytes()
+            .await?);
+    }
+    let credentials = credentials(provider, server_key)?;
+    let domain = url::Url::parse(&provider.public_base_url)?
+        .host_str()
+        .context("七牛公开域名缺失")?
+        .to_owned();
+    let key = key.to_owned();
+    let data = tokio::task::spawn_blocking(move || {
+        let manager = DownloadManager::new(UrlsSigner::new(
+            Credential::new(credentials.access_key, credentials.secret_key),
+            StaticDomainsUrlsGenerator::new(domain),
+        ));
+        let mut data = Vec::new();
+        manager.download(&key)?.to_writer(&mut data)?;
+        Ok::<_, anyhow::Error>(data)
+    })
+    .await??;
+    Ok(Bytes::from(data))
+}
+
+/// 删除对象；数据库记录由调用方在对象删除成功后处理。
+pub async fn delete(provider: &storage_provider::Model, server_key: &str, key: &str) -> Result<()> {
+    if provider.kind == StorageProviderKind::AliyunOss {
+        client(provider, server_key)?
+            .delete(&Path::from(key))
+            .await?;
+        return Ok(());
+    }
+    let credentials = credentials(provider, server_key)?;
+    let bucket = qiniu_bucket(provider)?;
+    let key = key.to_owned();
+    tokio::task::spawn_blocking(move || {
+        let manager = ObjectsManager::new(Credential::new(
+            credentials.access_key,
+            credentials.secret_key,
+        ));
+        manager.bucket(bucket).delete_object(&key).call()?;
+        Ok::<_, anyhow::Error>(())
+    })
+    .await?
 }
 
 #[cfg(test)]
@@ -108,7 +227,7 @@ mod tests {
     }
 
     #[test]
-    fn qiniu_client_uses_database_configuration() {
+    fn qiniu_configuration_does_not_require_s3_fields() {
         let credentials = Credentials {
             access_key: "access".into(),
             secret_key: "secret".into(),
@@ -118,16 +237,16 @@ mod tests {
             kind: StorageProviderKind::QiniuKodo,
             name: "七牛测试".into(),
             public_base_url: "https://cdn.example.com".into(),
-            endpoint: Some("https://s3-cn-east-1.qiniucs.com".into()),
+            endpoint: None,
             bucket: Some("example-bucket".into()),
-            region: Some("cn-east-1".into()),
+            region: None,
             encrypted_credentials: Some(
                 encrypt_credentials(&credentials, "server-secret").unwrap(),
             ),
             upload_enabled: true,
             created_at: chrono::Utc::now(),
         };
-        assert!(client(&provider, "server-secret").is_ok());
-        assert!(client(&provider, "wrong-secret").is_err());
+        assert!(configured(&provider, "server-secret").is_ok());
+        assert!(configured(&provider, "wrong-secret").is_err());
     }
 }

@@ -3,11 +3,15 @@
 use std::env;
 
 use anyhow::{Context, Result};
+use axum::body::Bytes;
 use qiniu_sdk::objects::{ObjectsManager, apis::credential::Credential};
 use rust_oxide::{
     config::Config,
     entity::{status::StorageProviderKind, storage_provider},
-    infrastructure::{secrets, storage::Credentials},
+    infrastructure::{
+        secrets,
+        storage::{self, Credentials},
+    },
 };
 use sea_orm::{ColumnTrait, Database, EntityTrait, QueryFilter};
 
@@ -50,9 +54,23 @@ fn check_provider(provider: &storage_provider::Model, server_key: &str) -> Resul
     }
 }
 
+/// 显式请求时执行随机对象的写入、读取和清理，验证完整素材链路。
+async fn check_write(provider: &storage_provider::Model, server_key: &str) -> Result<()> {
+    let key = format!("oxide-probe/{}", uuid::Uuid::new_v4());
+    let content = Bytes::from_static(b"oxide storage probe");
+    storage::put(provider, server_key, &key, content.clone(), "text/plain").await?;
+    let read_result = storage::get(provider, server_key, &key).await;
+    let cleanup_result = storage::delete(provider, server_key, &key).await;
+    let received = read_result.context("七牛测试对象读取失败")?;
+    cleanup_result.context("七牛测试对象清理失败")?;
+    anyhow::ensure!(received == content, "七牛测试对象内容不匹配");
+    Ok(())
+}
+
 /// SeaORM 只读加载七牛配置，再由 SDK 验证空间访问权限。
 #[tokio::main]
 async fn main() -> Result<()> {
+    let write = env::args().any(|arg| arg == "--write");
     let config = Config::load()?;
     let db = Database::connect(&config.database_url)
         .await
@@ -82,6 +100,18 @@ async fn main() -> Result<()> {
                     provider.id
                 );
                 failed = true;
+            }
+        }
+        if write {
+            match check_write(&provider, &config.comment_hash_key).await {
+                Ok(()) => println!("{}: 博客存储适配器上传、读取和清理成功", provider.id),
+                _ => {
+                    println!(
+                        "{}: 博客存储适配器写入链路失败（敏感错误详情未输出）",
+                        provider.id
+                    );
+                    failed = true;
+                }
             }
         }
     }

@@ -8,7 +8,8 @@ import {
 import { SiteHeader } from "../components/layout/SiteHeader";
 import { SiteFooter } from "../components/layout/SiteFooter";
 import { getSiteData } from "../lib/api/server";
-import appCss from "../styles/app.css?url";
+import tailwindCss from "../styles/tailwind.css?url";
+import appScss from "../styles/app.scss?url";
 
 export const Route = createRootRoute({
   loader: ({ location }) =>
@@ -21,7 +22,8 @@ export const Route = createRootRoute({
       { name: "description", content: "文章、思考与记录。" },
     ],
     links: [
-      { rel: "stylesheet", href: appCss },
+      { rel: "stylesheet", href: tailwindCss },
+      { rel: "stylesheet", href: appScss },
       { rel: "alternate", type: "application/rss+xml", title: "Oxide RSS", href: "/feed.xml" },
     ],
   }),

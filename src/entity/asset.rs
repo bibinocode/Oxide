@@ -1,7 +1,7 @@
 //! 图片等上传素材的元数据。
 
-use sea_orm::Set;
 use sea_orm::entity::prelude::*;
+use sea_orm::{NotSet, Set};
 
 use super::status::AssetVisibility;
 
@@ -44,8 +44,16 @@ impl ActiveModelBehavior for ActiveModel {
     /// 新素材自动取得稳定的外部标识。
     fn new() -> Self {
         Self {
+            id: NotSet,
             public_id: Set(Uuid::new_v4()),
-            ..Default::default()
+            provider_id: NotSet,
+            object_key: NotSet,
+            mime_type: NotSet,
+            size_bytes: NotSet,
+            width: NotSet,
+            height: NotSet,
+            visibility: NotSet,
+            created_at: NotSet,
         }
     }
 
@@ -58,5 +66,18 @@ impl ActiveModelBehavior for ActiveModel {
             self.public_id = Set(Uuid::new_v4());
         }
         Ok(self)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 默认构造不得递归，且每个素材获得独立的公开 ID。
+    #[test]
+    fn default_asset_has_public_uuid() {
+        let first: ActiveModel = Default::default();
+        let second: ActiveModel = Default::default();
+        assert_ne!(first.public_id.unwrap(), second.public_id.unwrap());
     }
 }

@@ -4,7 +4,12 @@ import type { ArticleSummary } from "../../../lib/api/types";
 export function ArticleRow({ article }: { article: ArticleSummary }) {
   return (
     <article>
-      <Link to="/articles/$slug" params={{ slug: article.slug }} className="catalog-row group">
+      <Link
+        to="/articles/$slug"
+        params={{ slug: article.slug }}
+        preload={false}
+        className="catalog-row group"
+      >
         <span className="catalog-row-title transition-colors group-hover:text-ink">
           {article.title}
         </span>

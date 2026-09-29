@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
-import { csrfHeaders, useAdminSession } from "./AdminSession";
-import { apiRequest } from "../../lib/api/client";
+import { csrfHeaders, useAdminSession } from "../AdminSession";
+import { apiRequest } from "../../../lib/api/client";
 
 interface AgentProvider {
   id: string;

@@ -37,15 +37,44 @@ export interface SiteSection {
   items: SiteItem[];
 }
 export interface SitePresentation {
+  home_intro: HomeIntroduction;
   footer_text: string;
   contacts: SiteSection;
   projects: SiteSection;
   services: SiteSection;
 }
 
+export interface HomeIntroduction {
+  enabled: boolean;
+  body: string;
+  portrait_url: string;
+  portrait_alt: string;
+  xiaohongshu?: XiaohongshuCard;
+}
+
+export interface XiaohongshuCard {
+  url: string;
+  name: string;
+  handle: string;
+  bio: string;
+  followers: string;
+  likes: string;
+}
+
+export function emptyXiaohongshuCard(): XiaohongshuCard {
+  return { url: "", name: "", handle: "", bio: "", followers: "", likes: "" };
+}
+
 /** 旧站点未填写模块时保持空列表，不显示占位或虚构内容。 */
 export function emptyPresentation(): SitePresentation {
   return {
+    home_intro: {
+      enabled: false,
+      body: "",
+      portrait_url: "",
+      portrait_alt: "",
+      xiaohongshu: emptyXiaohongshuCard(),
+    },
     footer_text: "",
     contacts: { enabled: false, items: [] },
     projects: { enabled: false, items: [] },
@@ -71,6 +100,30 @@ export interface AdminArticle extends ArticleSummary {
   status: "draft" | "published";
   document: Record<string, unknown>;
   updated_at: string;
+  notion_page_id: string | null;
+  notion_last_edited_at: string | null;
+}
+
+export interface NotionPage {
+  id: string;
+  title: string;
+  url: string;
+  last_edited_at: string;
+  article_public_id: string | null;
+  article_status: "draft" | "published" | null;
+  synced_edited_at: string | null;
+  local_changes: boolean;
+}
+
+export interface NotionPageList {
+  items: NotionPage[];
+  next_cursor: string | null;
+}
+
+export interface NotionSyncResult {
+  outcome: "created" | "updated" | "unchanged";
+  article: AdminArticle;
+  warnings: string[];
 }
 
 export interface Session {

@@ -4,6 +4,7 @@ import { PixelMark } from "../../../components/layout/PrintMarks";
 import { apiRequest } from "../../../lib/api/client";
 import { useArticleHtml } from "../hooks/useArticleHtml";
 import { useScrollReveal } from "../hooks/useScrollReveal";
+import { ImageLightbox, type ZoomImage } from "./ImageLightbox";
 
 interface ArticlePresentationProps {
   title: string;
@@ -47,6 +48,7 @@ export function ArticlePresentation({
   const activeLink = useRef<HTMLAnchorElement | null>(null);
   const [linkCard, setLinkCard] = useState<LinkCard | null>(null);
   const [imageFailed, setImageFailed] = useState(false);
+  const [zoomImage, setZoomImage] = useState<ZoomImage | null>(null);
   useEffect(() => {
     const root = prose.current;
     if (!root) return;
@@ -69,7 +71,22 @@ export function ArticlePresentation({
         anchor.prepend(icon);
       }
     }
+    for (const image of root.querySelectorAll<HTMLImageElement>("img:not(.article-link-icon)")) {
+      image.tabIndex = 0;
+      image.setAttribute("role", "button");
+      image.setAttribute("aria-label", `放大图片：${image.alt || "文章配图"}`);
+    }
   }, [renderedHtml]);
+
+  function openImage(image: HTMLImageElement) {
+    setZoomImage({
+      src: image.currentSrc || image.src,
+      alt: image.alt,
+      origin: image.getBoundingClientRect(),
+      width: image.naturalWidth || image.width,
+      height: image.naturalHeight || image.height,
+    });
+  }
 
   function hideLinkCard() {
     activeLink.current = null;
@@ -139,9 +156,22 @@ export function ArticlePresentation({
       {coverUrl && (
         <figure className="article-cover">
           <div className="article-cover-photo">
-            <img src={coverUrl} alt={title ? `${title} · 主图` : "文章主图"} />
+            <img
+              src={coverUrl}
+              alt={title ? `${title} · 主图` : "文章主图"}
+              role="button"
+              tabIndex={0}
+              aria-label="放大文章主图"
+              onClick={(event) => openImage(event.currentTarget)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  openImage(event.currentTarget);
+                }
+              }}
+            />
           </div>
-          <figcaption aria-hidden="true">⠕⠭⠊⠙⠑ · ⠎⠞⠥⠙⠊⠕</figcaption>
+          <figcaption>{title || "文章主图"}</figcaption>
         </figure>
       )}
       <header className="article-title-card">
@@ -184,7 +214,23 @@ export function ArticlePresentation({
         id={bodyId}
         ref={prose}
         className="prose-blog article-prose"
-        onClick={copyCode}
+        onClick={(event) => {
+          const image = (event.target as Element).closest<HTMLImageElement>(
+            "img:not(.article-link-icon)",
+          );
+          if (image) openImage(image);
+          else void copyCode(event);
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          const image = (event.target as Element).closest<HTMLImageElement>(
+            "img:not(.article-link-icon)",
+          );
+          if (image) {
+            event.preventDefault();
+            openImage(image);
+          }
+        }}
         onPointerOver={(event) => {
           if (event.pointerType === "touch") return;
           const anchor = (event.target as Element).closest<HTMLAnchorElement>(
@@ -236,6 +282,7 @@ export function ArticlePresentation({
           </aside>,
           document.body,
         )}
+      {zoomImage && <ImageLightbox image={zoomImage} onClose={() => setZoomImage(null)} />}
     </article>
   );
 }

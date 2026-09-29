@@ -7,22 +7,22 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use chrono::{DateTime, Utc};
-use object_store::{ObjectStoreExt, path::Path as ObjectPath};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder,
-    QuerySelect, Set,
+    QuerySelect, Set, TransactionTrait,
 };
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
+    domain::site::SitePresentation,
     entity::{
         asset, site_setting,
         status::{AssetVisibility, StorageProviderKind},
         storage_provider,
     },
-    infrastructure::storage::{Credentials, client, encrypt_credentials},
+    infrastructure::storage::{self, Credentials, encrypt_credentials},
 };
 
 use super::super::{ApiError, AppState, error};
@@ -442,7 +442,7 @@ pub async fn activate_provider(
             );
         }
     };
-    if client(&row, &state.comment_hash_key).is_err() {
+    if storage::configured(&row, &state.comment_hash_key).is_err() {
         return error(
             StatusCode::SERVICE_UNAVAILABLE,
             "provider_unconfigured",
@@ -509,7 +509,7 @@ pub async fn activate_provider(
     }
 }
 
-/// 无旧素材引用且非当前上传源时允许删除提供商。
+/// 无旧素材引用时删除提供商；当前上传源会在同一事务中清空。
 #[utoipa::path(delete, path = "/api/v1/admin/storage-providers/{id}", params(("id" = String, Path)), responses((status = 204), (status = 409, body = ApiError)), tag = "admin")]
 pub async fn delete_provider(
     State(state): State<AppState>,
@@ -519,25 +519,54 @@ pub async fn delete_provider(
     if let Err(response) = require_admin(&state, &headers, true).await {
         return response;
     }
-    if active_provider_id(&state).await.ok().flatten().as_deref() == Some(id.as_str()) {
-        return error(
-            StatusCode::CONFLICT,
-            "provider_active",
-            "当前上传提供商不可删除",
-        );
+    let result = async {
+        let txn = state.db.begin().await?;
+        if storage_provider::Entity::find_by_id(&id)
+            .one(&txn)
+            .await?
+            .is_none()
+        {
+            return Ok::<_, sea_orm::DbErr>(None);
+        }
+        if asset::Entity::find()
+            .filter(asset::Column::ProviderId.eq(&id))
+            .one(&txn)
+            .await?
+            .is_some()
+        {
+            return Ok(Some(false));
+        }
+        if let Some(settings) = site_setting::Entity::find_by_id(1).one(&txn).await?
+            && settings.active_provider_id.as_deref() == Some(id.as_str())
+        {
+            let mut active = settings.into_active_model();
+            active.active_provider_id = Set(None);
+            active.updated_at = Set(Utc::now());
+            active.update(&txn).await?;
+        }
+        storage_provider::Entity::delete_by_id(&id)
+            .exec(&txn)
+            .await?;
+        txn.commit().await?;
+        Ok(Some(true))
     }
-    match storage_provider::Entity::delete_many()
-        .filter(storage_provider::Column::Id.eq(id))
-        .exec(&state.db)
-        .await
-    {
-        Ok(result) if result.rows_affected > 0 => StatusCode::NO_CONTENT.into_response(),
-        Ok(_) => error(StatusCode::NOT_FOUND, "provider_not_found", "提供商不存在"),
-        Err(_) => error(
+    .await;
+    match result {
+        Ok(Some(true)) => StatusCode::NO_CONTENT.into_response(),
+        Ok(Some(false)) => error(
             StatusCode::CONFLICT,
             "provider_in_use",
-            "提供商仍有素材引用",
+            "提供商仍有素材引用，请先处理素材",
         ),
+        Ok(None) => error(StatusCode::NOT_FOUND, "provider_not_found", "提供商不存在"),
+        Err(err) => {
+            tracing::error!(error = %err, "删除存储提供商失败");
+            error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "internal_error",
+                "服务暂时不可用",
+            )
+        }
     }
 }
 
@@ -590,6 +619,7 @@ pub async fn upload(
     headers: HeaderMap,
     mut multipart: Multipart,
 ) -> Response {
+    tracing::debug!("开始处理素材上传");
     if let Err(response) = require_admin(&state, &headers, true).await {
         return response;
     }
@@ -632,6 +662,7 @@ pub async fn upload(
         Ok(bytes) => bytes,
         Err(_) => return error(StatusCode::BAD_REQUEST, "invalid_asset", "无法读取图片"),
     };
+    tracing::debug!("已读取上传数据");
     if bytes.is_empty() || bytes.len() > 8 * 1024 * 1024 {
         return error(StatusCode::BAD_REQUEST, "invalid_asset", "图片大小无效");
     }
@@ -655,32 +686,45 @@ pub async fn upload(
         Ok(size) if size.width <= 10_000 && size.height <= 10_000 => size,
         _ => return error(StatusCode::BAD_REQUEST, "invalid_asset", "图片尺寸无效"),
     };
+    tracing::debug!("图片格式与尺寸校验完成");
     let public_id = Uuid::new_v4();
     let key = format!("assets/{public_id}.{extension}");
-    let path = ObjectPath::from(key.clone());
-    let store = match client(&provider, &state.comment_hash_key) {
-        Ok(store) => store,
-        Err(err) => {
-            tracing::error!(error = %err, "初始化存储失败");
-            return error(
-                StatusCode::SERVICE_UNAVAILABLE,
-                "provider_unconfigured",
-                "存储提供商配置不完整",
-            );
-        }
-    };
-    if let Err(err) = store.put(&path, bytes.clone().into()).await {
+    if let Err(err) = storage::configured(&provider, &state.comment_hash_key) {
+        tracing::error!(error = %err, "初始化存储失败");
+        return error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "provider_unconfigured",
+            "存储提供商配置不完整",
+        );
+    }
+    tracing::debug!(provider = %provider.id, "开始写入对象存储");
+    if let Err(err) = storage::put(
+        &provider,
+        &state.comment_hash_key,
+        &key,
+        bytes.clone(),
+        mime,
+    )
+    .await
+    {
         tracing::error!(error = %err, "上传素材失败");
+        let message = match provider.kind {
+            StorageProviderKind::QiniuKodo => {
+                "七牛上传失败，请检查空间写入权限、绑定域名及网络连接"
+            }
+            StorageProviderKind::AliyunOss => "阿里云 OSS 上传失败，请检查端点、区域和写入权限",
+        };
         return error(
             StatusCode::SERVICE_UNAVAILABLE,
             "storage_unavailable",
-            "素材上传失败",
+            message,
         );
     }
+    tracing::debug!("对象存储写入完成");
     let model = asset::ActiveModel {
         public_id: Set(public_id),
-        provider_id: Set(provider.id),
-        object_key: Set(key),
+        provider_id: Set(provider.id.clone()),
+        object_key: Set(key.clone()),
         mime_type: Set(mime.into()),
         size_bytes: Set(bytes.len() as i64),
         width: Set(Some(dimensions.width as i32)),
@@ -693,7 +737,7 @@ pub async fn upload(
         Ok(row) => (StatusCode::CREATED, Json(asset_response(row))).into_response(),
         Err(err) => {
             tracing::error!(error = %err, "保存素材元数据失败");
-            let _ = store.delete(&path).await;
+            let _ = storage::delete(&provider, &state.comment_hash_key, &key).await;
             error(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "internal_error",
@@ -730,6 +774,13 @@ pub async fn set_visibility(
             );
         }
     };
+    if !input.public && portrait_uses_asset(&state, public_id).await {
+        return error(
+            StatusCode::CONFLICT,
+            "asset_in_use",
+            "首页肖像正在使用该素材",
+        );
+    }
     let mut active = row.into_active_model();
     active.visibility = Set(if input.public {
         AssetVisibility::Public
@@ -775,6 +826,13 @@ pub async fn delete_asset(
             );
         }
     };
+    if portrait_uses_asset(&state, public_id).await {
+        return error(
+            StatusCode::CONFLICT,
+            "asset_in_use",
+            "首页肖像正在使用该素材",
+        );
+    }
     let provider = match storage_provider::Entity::find_by_id(&row.provider_id)
         .one(&state.db)
         .await
@@ -788,16 +846,13 @@ pub async fn delete_asset(
             );
         }
     };
-    let store = match client(&provider, &state.comment_hash_key) {
-        Ok(store) => store,
-        Err(_) => {
-            return error(
-                StatusCode::SERVICE_UNAVAILABLE,
-                "provider_unconfigured",
-                "存储提供商配置不完整",
-            );
-        }
-    };
+    if storage::configured(&provider, &state.comment_hash_key).is_err() {
+        return error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "provider_unconfigured",
+            "存储提供商配置不完整",
+        );
+    }
     if asset::Entity::delete_by_id(row.id)
         .exec(&state.db)
         .await
@@ -805,8 +860,23 @@ pub async fn delete_asset(
     {
         return error(StatusCode::CONFLICT, "asset_in_use", "素材仍被文章使用");
     }
-    if let Err(err) = store.delete(&ObjectPath::from(row.object_key)).await {
+    if let Err(err) = storage::delete(&provider, &state.comment_hash_key, &row.object_key).await {
         tracing::error!(error = %err, "清理对象存储素材失败");
     }
     StatusCode::NO_CONTENT.into_response()
+}
+
+/// 检查首页配置对素材的引用，避免删除或私有化后出现失效肖像。
+async fn portrait_uses_asset(state: &AppState, public_id: Uuid) -> bool {
+    match site_setting::Entity::find_by_id(1).one(&state.db).await {
+        Ok(Some(row)) => row
+            .presentation
+            .and_then(|value| serde_json::from_value::<SitePresentation>(value).ok())
+            .is_some_and(|value| value.home_intro.portrait_url == format!("/media/{public_id}")),
+        Ok(None) => false,
+        Err(err) => {
+            tracing::error!(error = %err, "检查首页肖像素材引用失败");
+            true
+        }
+    }
 }

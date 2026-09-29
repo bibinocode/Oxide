@@ -1,5 +1,15 @@
 import type { ApiError } from "./types";
 
+export class ApiRequestError extends Error {
+  constructor(
+    message: string,
+    readonly code: string,
+    readonly status: number,
+  ) {
+    super(message);
+  }
+}
+
 /** 浏览器写请求使用 Vite/部署反向代理的同源路径。 */
 export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
@@ -14,7 +24,7 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
     const error = (await response
       .json()
       .catch(() => ({ code: "http_error", message: `请求失败 (${response.status})` }))) as ApiError;
-    throw new Error(error.message);
+    throw new ApiRequestError(error.message, error.code, response.status);
   }
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;

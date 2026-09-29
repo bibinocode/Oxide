@@ -5,13 +5,12 @@ use axum::{
     http::{HeaderMap, StatusCode, header},
     response::{IntoResponse, Response},
 };
-use object_store::{ObjectStoreExt, path::Path as ObjectPath};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use uuid::Uuid;
 
 use crate::{
     entity::{asset, status::AssetVisibility, storage_provider},
-    infrastructure::storage::client,
+    infrastructure::storage,
 };
 
 use super::super::admin::auth::require_admin;
@@ -58,28 +57,23 @@ pub async fn media(
             );
         }
     };
-    let store = match client(&provider, &state.comment_hash_key) {
-        Ok(store) => store,
-        Err(_) => {
+    if storage::configured(&provider, &state.comment_hash_key).is_err() {
+        return error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "provider_unconfigured",
+            "存储提供商配置不完整",
+        );
+    }
+    let bytes = match storage::get(&provider, &state.comment_hash_key, &row.object_key).await {
+        Ok(bytes) => bytes,
+        Err(err) => {
+            tracing::error!(error = %err, "读取对象存储素材失败");
             return error(
                 StatusCode::SERVICE_UNAVAILABLE,
-                "provider_unconfigured",
-                "存储提供商配置不完整",
+                "storage_unavailable",
+                "存储暂时不可用",
             );
         }
-    };
-    let bytes = match store.get(&ObjectPath::from(row.object_key)).await {
-        Ok(object) => match object.bytes().await {
-            Ok(bytes) => bytes,
-            Err(_) => {
-                return error(
-                    StatusCode::SERVICE_UNAVAILABLE,
-                    "storage_unavailable",
-                    "存储暂时不可用",
-                );
-            }
-        },
-        Err(_) => return error(StatusCode::NOT_FOUND, "asset_not_found", "素材不存在"),
     };
     let cache = if row.visibility == AssetVisibility::Public {
         "public, max-age=86400"

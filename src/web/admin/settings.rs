@@ -10,7 +10,7 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, Query
 use serde::Deserialize;
 use utoipa::ToSchema;
 
-use crate::entity::{category, site_setting, tag};
+use crate::entity::{asset, category, site_setting, status::AssetVisibility, tag};
 
 use super::super::{
     ApiError, AppState,
@@ -80,6 +80,39 @@ pub async fn update_site(
             .is_ok_and(|url| matches!(url.scheme(), "http" | "https") && url.host_str().is_some())
     {
         return error(StatusCode::BAD_REQUEST, "invalid_site", "站点设置无效");
+    }
+    if let Some(portrait_url) = input
+        .presentation
+        .as_ref()
+        .map(|value| &value.home_intro.portrait_url)
+        && !portrait_url.is_empty()
+    {
+        let id = uuid::Uuid::parse_str(portrait_url.trim_start_matches("/media/"))
+            .expect("公开配置已验证素材地址");
+        match asset::Entity::find()
+            .filter(asset::Column::PublicId.eq(id))
+            .one(&state.db)
+            .await
+        {
+            Ok(Some(row))
+                if row.visibility == AssetVisibility::Public
+                    && row.mime_type.starts_with("image/") => {}
+            Ok(_) => {
+                return error(
+                    StatusCode::BAD_REQUEST,
+                    "invalid_portrait",
+                    "请选择已公开的图片素材",
+                );
+            }
+            Err(err) => {
+                tracing::error!(error = %err, "校验首页肖像素材失败");
+                return error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "internal_error",
+                    "服务暂时不可用",
+                );
+            }
+        }
     }
     let previous = match site_setting::Entity::find_by_id(1).one(&state.db).await {
         Ok(row) => row,

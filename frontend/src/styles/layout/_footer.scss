@@ -1,0 +1,36 @@
+.site-footer {
+  margin-top: 96px;
+  padding-bottom: 112px;
+  color: var(--page-subtle);
+}
+.site-footer-grid {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 1fr;
+  gap: 24px;
+  border-top: 1px solid var(--page-line);
+  padding-top: 28px;
+}
+.site-footer h2 {
+  font-size: 11px;
+  font-family: var(--font-mono);
+}
+.site-footer ul {
+  margin-top: 12px;
+  font-size: 12px;
+}
+.site-footer li {
+  position: relative;
+  padding: 4px 0 4px 16px;
+  border-left: 1px solid var(--page-line);
+}
+.site-footer li::before {
+  content: "";
+  position: absolute;
+  top: 14px;
+  left: 0;
+  width: 9px;
+  border-top: 1px solid var(--page-line);
+}
+.site-footer a:hover {
+  color: var(--page-text);
+}

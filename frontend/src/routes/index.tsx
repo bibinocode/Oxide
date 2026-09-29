@@ -5,6 +5,7 @@ import { getHomeData } from "../lib/api/server";
 import { SiteSection } from "../components/layout/SiteSection";
 import { ContentSkeleton } from "../components/layout/ContentSkeleton";
 import { RevealContent } from "../components/layout/RevealContent";
+import { HomeIntroduction } from "../features/home/HomeIntroduction";
 
 export const Route = createFileRoute("/")({
   loader: () => getHomeData(),
@@ -16,17 +17,25 @@ function Home() {
   const { site, articles, categories, tags } = Route.useLoaderData();
   return (
     <main className="public-width pt-10 md:pt-14">
-      <section aria-labelledby="site-title">
-        <div className="flex items-center gap-3">
-          <h1 id="site-title" className="text-base font-semibold text-ink">
-            {site.site_name}
-          </h1>
-          <PixelMark />
-        </div>
-        <p className="mt-5 max-w-[34rem] text-sm leading-7 text-muted">
-          {site.description ?? "关于技术、设计与日常的记录。"}
-        </p>
-      </section>
+      {site.presentation?.home_intro?.enabled ? (
+        <HomeIntroduction
+          name={site.site_name}
+          description={site.description}
+          value={site.presentation.home_intro}
+        />
+      ) : (
+        <section aria-labelledby="site-title">
+          <div className="flex items-center gap-3">
+            <h1 id="site-title" className="text-base font-semibold text-ink">
+              {site.site_name}
+            </h1>
+            <PixelMark />
+          </div>
+          <p className="mt-5 max-w-[34rem] text-sm leading-7 text-muted">
+            {site.description ?? "关于技术、设计与日常的记录。"}
+          </p>
+        </section>
+      )}
 
       <section className="mt-16" aria-labelledby="writing-heading">
         <div className="flex items-center justify-between">

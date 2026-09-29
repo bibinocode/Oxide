@@ -29,6 +29,8 @@ pub struct Config {
     pub public_base_url: String,
     /// Tantivy 持久化索引目录。
     pub search_index_dir: String,
+    /// 可选的 Notion 集成密钥，只传入后端服务。
+    pub notion_api_key: Option<String>,
 }
 
 impl Config {
@@ -104,6 +106,7 @@ impl Config {
             public_base_url: public_base_url.trim_end_matches('/').into(),
             search_index_dir: get("SEARCH_INDEX_DIR")
                 .unwrap_or_else(|| "./data/search-index".into()),
+            notion_api_key: get("NOTION_API_KEY").filter(|value| !value.trim().is_empty()),
         })
     }
 }

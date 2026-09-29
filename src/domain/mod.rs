@@ -2,4 +2,5 @@
 
 pub mod agent;
 pub mod article;
+pub mod notion;
 pub mod site;

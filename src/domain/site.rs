@@ -31,10 +31,78 @@ pub struct SiteSection {
     pub items: Vec<SiteItem>,
 }
 
+/// 首页个人介绍；照片指向本站已公开的素材，空值时只显示文字。
+#[derive(Clone, Debug, Default, Deserialize, Serialize, ToSchema)]
+#[serde(default)]
+pub struct HomeIntroduction {
+    /// 是否启用独立的个人介绍布局。
+    pub enabled: bool,
+    /// 按换行分段的介绍正文。
+    pub body: String,
+    /// 已公开肖像素材的稳定站内地址。
+    pub portrait_url: String,
+    /// 肖像替代文字。
+    pub portrait_alt: String,
+    /// 小红书公开资料卡；平台不提供稳定公开接口时使用站长维护的快照。
+    pub xiaohongshu: XiaohongshuCard,
+}
+
+/// 与首页介绍中的小红书个人主页链接匹配的资料快照。
+#[derive(Clone, Debug, Default, Deserialize, Serialize, ToSchema)]
+#[serde(default)]
+pub struct XiaohongshuCard {
+    /// 个人主页地址；留空时禁用资料快照。
+    pub url: String,
+    /// 卡片姓名。
+    pub name: String,
+    /// 小红书号。
+    pub handle: String,
+    /// 个人简介，可包含换行。
+    pub bio: String,
+    /// 粉丝数展示文本，例如 10+。
+    pub followers: String,
+    /// 获赞与收藏展示文本，例如 1千+。
+    pub likes: String,
+}
+
+impl XiaohongshuCard {
+    /// 限定为小红书个人主页，不允许任意外链冒充资料卡。
+    fn is_valid(&self) -> bool {
+        if self.url.is_empty() {
+            return self.name.is_empty()
+                && self.handle.is_empty()
+                && self.bio.is_empty()
+                && self.followers.is_empty()
+                && self.likes.is_empty();
+        }
+        let valid_url = url::Url::parse(&self.url).is_ok_and(|url| {
+            url.scheme() == "https"
+                && url
+                    .host_str()
+                    .is_some_and(|host| host == "xiaohongshu.com" || host == "www.xiaohongshu.com")
+                && url.port().is_none()
+                && url.username().is_empty()
+                && url.password().is_none()
+                && url.path().strip_prefix("/user/profile/").is_some_and(|id| {
+                    id.len() == 24 && id.bytes().all(|byte| byte.is_ascii_hexdigit())
+                })
+        });
+        valid_url
+            && self.url.len() <= 2048
+            && self.name.chars().count() <= 80
+            && self.handle.chars().count() <= 80
+            && self.bio.chars().count() <= 500
+            && self.followers.chars().count() <= 32
+            && self.likes.chars().count() <= 32
+    }
+}
+
 /// 站点公开展示设置，新增字段通过默认值兼容旧配置。
 #[derive(Clone, Debug, Default, Deserialize, Serialize, ToSchema)]
 #[serde(default)]
 pub struct SitePresentation {
+    /// 首页个人介绍。
+    pub home_intro: HomeIntroduction,
     /// 页脚署名；空值时使用站点名称。
     pub footer_text: String,
     /// 联系方式列表。
@@ -49,6 +117,15 @@ impl SitePresentation {
     /// 校验公开文本和链接；只接受 HTTP(S)、mailto 和站内路径。
     pub fn is_valid(&self) -> bool {
         self.footer_text.chars().count() <= 200
+            && self.home_intro.body.chars().count() <= 2000
+            && self.home_intro.portrait_alt.chars().count() <= 120
+            && self.home_intro.xiaohongshu.is_valid()
+            && (self.home_intro.portrait_url.is_empty()
+                || self
+                    .home_intro
+                    .portrait_url
+                    .strip_prefix("/media/")
+                    .is_some_and(|id| uuid::Uuid::parse_str(id).is_ok()))
             && [&self.contacts, &self.projects, &self.services]
                 .iter()
                 .all(|section| {
@@ -106,6 +183,35 @@ mod tests {
         config.contacts.items[0].avatar_url = "https://example.com/avatar.jpg".into();
         assert!(config.is_valid());
         config.contacts.items[0].stat_text = "x".repeat(81);
+        assert!(!config.is_valid());
+    }
+
+    #[test]
+    fn home_portrait_requires_stable_media_url() {
+        let mut config = SitePresentation::default();
+        config.home_intro.portrait_url = "https://example.com/photo.jpg".into();
+        assert!(!config.is_valid());
+        config.home_intro.portrait_url = format!("/media/{}", uuid::Uuid::new_v4());
+        assert!(config.is_valid());
+        config.home_intro.body = "a".repeat(2001);
+        assert!(!config.is_valid());
+        let old: SitePresentation = serde_json::from_value(serde_json::json!({
+            "footer_text": "旧站点",
+            "contacts": { "enabled": false, "items": [] }
+        }))
+        .unwrap();
+        assert!(!old.home_intro.enabled);
+    }
+
+    #[test]
+    fn xiaohongshu_card_requires_matching_profile_url() {
+        let mut config = SitePresentation::default();
+        config.home_intro.xiaohongshu.url =
+            "https://www.xiaohongshu.com/user/profile/5cbba503000000001101b6a2".into();
+        config.home_intro.xiaohongshu.name = "站长".into();
+        assert!(config.is_valid());
+        config.home_intro.xiaohongshu.url =
+            "https://xiaohongshu.com.evil.test/user/profile/5cbba503000000001101b6a2".into();
         assert!(!config.is_valid());
     }
 }

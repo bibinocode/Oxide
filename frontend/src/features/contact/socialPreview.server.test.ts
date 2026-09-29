@@ -20,6 +20,16 @@ test("社交账号链接按平台规范化", () => {
   });
   assert.equal(parseProfile("https://telegram.me/example")?.url, "https://t.me/example");
   assert.equal(parseProfile("https://github.com/example")?.service, "github");
+  assert.deepEqual(
+    parseProfile(
+      "https://www.xiaohongshu.com/user/profile/5cbba503000000001101b6a2?xsec_token=temporary",
+    ),
+    {
+      service: "xiaohongshu",
+      handle: "5cbba503000000001101b6a2",
+      url: "https://www.xiaohongshu.com/user/profile/5cbba503000000001101b6a2",
+    },
+  );
 });
 
 test("拒绝任意域名、凭据、非主页路径和不安全协议", () => {
@@ -31,6 +41,7 @@ test("拒绝任意域名、凭据、非主页路径和不安全协议", () => {
     "https://youtube.com/redirect?to=http://127.0.0.1",
     "https://t.me/+invite",
     "https://x.com/example%2Fsecret",
+    "https://www.xiaohongshu.com/explore/5cbba503000000001101b6a2",
   ]) {
     assert.equal(parseProfile(input), null, input);
   }

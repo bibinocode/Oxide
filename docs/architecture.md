@@ -58,7 +58,9 @@ migration/                # SeaORM 迁移 crate，使用 Schema API
 frontend/                 # TanStack Start 应用（独立 package 与锁文件）
   src/
     routes/               # 文件路由；页面、loader、元数据与错误边界
-    features/             # article、search、comment、editor、asset、admin
+    features/             # article、comment、contact、editor、home、admin
+      admin/              # agent、home、settings 子功能；会话上下文留在 admin 根目录
+      contact/            # 资料解析、服务端抓取与悬停卡片
     components/
       ui/                 # Button、Input、Dialog 等通用组件
       layout/             # 站点导航、页脚、管理端布局
@@ -67,9 +69,11 @@ frontend/                 # TanStack Start 应用（独立 package 与锁文件�
       api/                # 类型化 API 客户端、请求上下文、错误映射
       utils/              # 无状态工具函数
     styles/
-      app.css             # Tailwind CSS 入口
-      tokens.css          # Tailwind 主题尺度和语义变量
-      global.css          # 字体、全局元素与可访问性
+      tailwind.css        # Tailwind CSS 4 与主题 token 入口
+      app.scss            # 业务样式入口，按原层叠顺序加载 partial
+      tokens.css          # Tailwind @theme 与运行时语义变量
+      admin/ article/ contact/ editor/ home/ layout/ base/ shared/
+                           # 按功能或跨功能职责拆分的 SCSS partial
     router.tsx            # TanStack Router 配置
   public/                 # 字体、站点图标等静态资源
 tests/                    # 关键业务流程与接口集成测试
@@ -103,9 +107,9 @@ docs/                     # 设计和部署文档
 
 ### 设计变量与视觉规范
 
-- 样式采用 Tailwind CSS 4。`app.css` 是唯一入口；`tokens.css` 集中定义纸张底色、灰阶、单点暖色信号、字体与 600px 网格 / 552px 阅读栏。组件优先使用语义变量和 Tailwind 工具类。
+- 样式采用 Tailwind CSS 4 与 SCSS。`tailwind.css` 只加载 Tailwind 与 `tokens.css`，使 `@theme` 与工具类在同一编译入口；`app.scss` 按功能加载局部 partial。两份构建产物依次进入根布局，业务规则始终覆盖工具类基础层。`tokens.css` 集中定义纸张底色、灰阶、单点暖色信号、字体与 600px 网格 / 552px 阅读栏。组件优先使用语义变量和 Tailwind 工具类。
 - 视觉规则对照 [cali.so dev 分支](https://github.com/CaliCastle/cali.so/tree/dev) 的 `docs/design-language.md`、`app/_views/home-page.tsx`、`app/_views/blog-index-page.tsx`、`components/post-row.tsx`：小号无衬线排版、窄栏、虚线列导轨、编号排线小节、标题与日期组成的点线目录行、底部固定导航。本站不使用参考站作者的肖像或文章素材。
-- `global.css` 承载纸张背景、导轨、目录行、底部导航与表单等跨路由基础样式；局部页面布局仍使用 Tailwind。彩色像素只在每页标题附近出现一次，其余文字、边框和按钮保持中性灰阶。
+- `styles/base` 和 `styles/shared` 承载基础元素、通用控件与动效；`layout`、`article`、`contact`、`editor`、`home`、`admin` 按界面职责维护规则。局部页面布局仍使用 Tailwind。彩色像素只在每页标题附近出现一次，其余文字、边框和按钮保持中性灰阶。
 - 公开页使用 552px 阅读栏；管理端独立于公开页，常规页面采用全屏侧栏与内容区。文章工作区隐藏侧栏并占满视口，桌面端左右等宽：左侧 Markdown 原文，右侧使用前台共用的文章组件实时预览；窄屏切换源码和预览。移动端给正文保留 16px 边距，并为公开页固定导航预留底部空间。
 - 所有交互组件覆盖默认、悬停、焦点、禁用、加载和错误状态；表单具备标签、错误文本和键盘操作。图标按钮带可访问名称及提示文字。
 - PC 端优先设计内容扫描和编辑效率；移动端重排布局和工具栏，不让文字溢出、控件重叠或内容被固定区域遮挡。

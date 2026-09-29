@@ -1,0 +1,30 @@
+.home-intro {
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 2rem;
+}
+.home-intro-copy {
+  min-width: 0;
+  max-width: 20rem;
+}
+.home-intro-body {
+  margin-top: 1rem;
+  color: var(--page-body);
+  font-size: 0.875rem;
+  line-height: 1.75;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.home-intro-body p + p {
+  margin-top: 0.75rem;
+}
+.home-intro-body .contact-preview-trigger {
+  border-bottom: 1px solid var(--page-line);
+  color: var(--page-text);
+  transition: border-color 150ms ease;
+}
+.home-intro-body .contact-preview-trigger:hover {
+  border-color: var(--page-text);
+}

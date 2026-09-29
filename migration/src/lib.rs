@@ -9,6 +9,7 @@ mod m20260928_000002_public_ids;
 mod m20260928_000003_site_presentation;
 mod m20260928_000004_provider_credentials;
 mod m20260928_000005_agent_core;
+mod m20260929_000006_notion_sync;
 mod v1_entity;
 
 /// 按版本顺序注册数据库迁移。
@@ -24,6 +25,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260928_000003_site_presentation::Migration),
             Box::new(m20260928_000004_provider_credentials::Migration),
             Box::new(m20260928_000005_agent_core::Migration),
+            Box::new(m20260929_000006_notion_sync::Migration),
         ]
     }
 }

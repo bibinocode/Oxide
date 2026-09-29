@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import type { SiteSettings } from "../../lib/api/types";
-import { ContactPreview } from "./ContactPreview";
+import { ContactPreview } from "../../features/contact/components/ContactPreview";
 import { ThemeControl } from "./ThemeControl";
 
 /** 页脚内容来自站点配置，与首页模块共用显示开关。 */

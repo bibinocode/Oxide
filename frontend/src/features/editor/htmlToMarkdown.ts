@@ -6,7 +6,7 @@ export function htmlToMarkdown(html: string): string {
   const document = new DOMParser().parseFromString(html, "text/html");
   document
     .querySelectorAll(
-      "script,style,iframe,object,embed,form,.article-link-icon,figure.article-code-frame > figcaption,button[data-copy-code]",
+      "script,style,iframe,object,embed,form,.article-link-icon,figure.article-code-frame > figcaption,figure.article-image > figcaption,button[data-copy-code]",
     )
     .forEach((node) => node.remove());
   const converter = new TurndownService({

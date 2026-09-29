@@ -306,6 +306,9 @@ mod tests {
             published_at: Some(now),
             created_at: now,
             updated_at: now,
+            notion_page_id: None,
+            notion_last_edited_at: None,
+            notion_synced_at: None,
         };
         engine.upsert(row).unwrap();
         assert_eq!(engine.search("分词", 1, 20).unwrap().1, vec![1]);

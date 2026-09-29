@@ -40,6 +40,8 @@ pub struct AppState {
     pub public_base_url: Arc<str>,
     /// 持久化搜索索引及分词器。
     pub search: Arc<SearchEngine>,
+    /// Notion 集成密钥；未配置时管理端同步接口返回明确错误。
+    pub notion_api_key: Option<Arc<str>>,
 }
 
 /// 统一错误格式，便于前端按 code 分支处理。
@@ -145,7 +147,7 @@ pub struct HealthResponse {
         admin::storage::delete_asset, client::media::media,
         admin::agent::providers, admin::agent::create_provider, admin::agent::update_provider,
         admin::agent::delete_provider, admin::agent::bindings, admin::agent::bind_task,
-        client::link_preview::preview),
+        client::link_preview::preview, admin::notion::pages, admin::notion::sync),
     components(schemas(ApiError, ArticleSummaryResponse, ArticlePageResponse, ArticleDetailResponse, HealthResponse,
         admin::auth::LoginRequest, admin::auth::SessionResponse, admin::auth::OkResponse,
         admin::preview::PreviewInput, admin::preview::PreviewResponse, admin::cover::CoverInput, admin::cover::CoverResponse,
@@ -156,7 +158,9 @@ pub struct HealthResponse {
         admin::settings::SiteInput, admin::settings::TaxonomyInput, admin::taxonomy::ArticleTaxonomy,
         admin::storage::ProviderInput, admin::storage::ProviderResponse, admin::storage::AssetResponse, admin::storage::VisibilityInput,
         admin::agent::ProviderInput, admin::agent::ProviderResponse, admin::agent::BindingInput,
-        admin::agent::BindingResponse, client::link_preview::LinkPreview)),
+        admin::agent::BindingResponse, client::link_preview::LinkPreview,
+        admin::notion::NotionPageItem, admin::notion::NotionPageList,
+        admin::notion::SyncInput, admin::notion::SyncResponse)),
     tags((name = "articles", description = "公开文章"), (name = "health", description = "进程健康检查"),
         (name = "admin", description = "管理员内容和会话"), (name = "site", description = "站点和订阅"),
         (name = "taxonomy", description = "分类和标签"), (name = "comments", description = "匿名评论"),
@@ -227,6 +231,11 @@ pub fn router(state: AppState) -> Router {
         .route("/api/v1/admin/login", post(admin::auth::login))
         .route("/api/v1/admin/logout", post(admin::auth::logout))
         .route("/api/v1/admin/session", get(admin::auth::current))
+        .route("/api/v1/admin/notion/pages", get(admin::notion::pages))
+        .route(
+            "/api/v1/admin/notion/pages/{page_id}/sync",
+            post(admin::notion::sync),
+        )
         .route(
             "/api/v1/admin/articles",
             get(admin::content::list).post(admin::content::create),
@@ -382,6 +391,7 @@ mod tests {
             session_secure: false,
             public_base_url: Arc::from("http://127.0.0.1:3000"),
             search: Arc::new(SearchEngine::in_memory()),
+            notion_api_key: None,
         })
     }
 
@@ -428,6 +438,8 @@ mod tests {
         assert_eq!(status, StatusCode::OK);
         assert!(doc["paths"]["/api/v1/articles"].is_object());
         assert!(doc["paths"]["/api/v1/articles/{slug}"].is_object());
+        assert!(doc["paths"]["/api/v1/admin/notion/pages"].is_object());
+        assert!(doc["paths"]["/api/v1/admin/notion/pages/{page_id}/sync"].is_object());
         let (status, body) = get("/health/live").await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(body["status"], "ok");
