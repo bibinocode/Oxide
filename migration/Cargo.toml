@@ -1,0 +1,11 @@
+[package]
+name = "rust-oxide-migration"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+sea-orm = { version = "=2.0.4", default-features = false, features = ["macros", "with-chrono", "with-json", "with-uuid", "sqlx-postgres", "runtime-tokio-rustls"] }
+sea-orm-migration = { version = "=2.0.4", default-features = false, features = ["sqlx-postgres", "runtime-tokio-rustls", "with-chrono", "with-json", "with-uuid"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+uuid = { version = "1", features = ["v4"] }

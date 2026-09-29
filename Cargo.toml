@@ -1,0 +1,52 @@
+[package]
+name = "rust-Oxide"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "rust_oxide"
+
+[workspace]
+members = ["migration"]
+resolver = "3"
+
+[dependencies]
+anyhow = "1"
+ammonia = "4"
+aes-gcm = "0.10"
+argon2 = "0.5"
+async-trait = "0.1"
+axum = { version = "=0.8.9", features = ["multipart"] }
+chrono = { version = "0.4", features = ["serde"] }
+cookie = "0.18"
+dotenvy = "0.15"
+hex = "0.4"
+hmac = "0.12"
+html-escape = "0.2"
+imagesize = { version = "0.15", default-features = false, features = ["jpeg", "png", "gif", "webp"] }
+infer = "0.22"
+jieba-rs = "0.11"
+object_store = { version = "0.14", default-features = false, features = ["aws"] }
+pulldown-cmark = "0.13"
+rand_core = { version = "0.6", features = ["getrandom"] }
+redis = { version = "1.0", features = ["tokio-comp"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+rss = "2"
+sea-orm = { version = "=2.0.4", default-features = false, features = ["macros", "with-chrono", "with-json", "with-uuid", "sqlx-postgres", "runtime-tokio-rustls"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+scraper = "0.24"
+sha2 = "0.10"
+tantivy = { version = "0.26", default-features = false, features = ["mmap", "lz4-compression"] }
+tokio = { version = "1", features = ["full"] }
+tower-http = { version = "0.6", features = ["trace"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+utoipa = { version = "6", features = ["chrono", "uuid"] }
+utoipa-swagger-ui = { version = "10", features = ["axum", "vendored"] }
+url = "2"
+uuid = { version = "1", features = ["v4"] }
+
+[dev-dependencies]
+qiniu-sdk = { version = "=0.2.4", default-features = false, features = ["objects", "ureq"] }
+tower = { version = "0.5", features = ["util"] }

@@ -1,0 +1,389 @@
+//! 管理员维护站点信息、分类和标签。
+
+use axum::{
+    Json,
+    extract::{Path, State},
+    http::{HeaderMap, StatusCode},
+    response::{IntoResponse, Response},
+};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
+use serde::Deserialize;
+use utoipa::ToSchema;
+
+use crate::entity::{category, site_setting, tag};
+
+use super::super::{
+    ApiError, AppState,
+    client::content::{SiteResponse, TaxonomyResponse},
+    error,
+};
+use super::auth::require_admin;
+
+/// 可编辑的公开站点信息。
+#[derive(Deserialize, ToSchema)]
+pub struct SiteInput {
+    /// 站点名称。
+    pub site_name: String,
+    /// 可选简介。
+    pub description: Option<String>,
+    /// 站点绝对 URL，用于 RSS 链接。
+    pub base_url: String,
+    /// 公开模块配置；省略时保留已有配置。
+    pub presentation: Option<crate::domain::site::SitePresentation>,
+}
+
+/// 分类与标签写入请求。
+#[derive(Deserialize, ToSchema)]
+pub struct TaxonomyInput {
+    /// 展示名称。
+    pub name: String,
+    /// URL slug。
+    pub slug: String,
+}
+
+/// 验证分类与标签的可公开字段。
+fn valid_taxonomy(input: &TaxonomyInput) -> bool {
+    let slug = input.slug.as_bytes();
+    !input.name.trim().is_empty()
+        && input.name.chars().count() <= 60
+        && (2..=80).contains(&slug.len())
+        && slug.first() != Some(&b'-')
+        && slug.last() != Some(&b'-')
+        && slug
+            .iter()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || *byte == b'-')
+}
+
+/// 保存站点名称、描述与公开地址；缺失时创建固定 ID 的设置行。
+#[utoipa::path(put, path = "/api/v1/admin/site", request_body = SiteInput, responses((status = 200, body = SiteResponse), (status = 400, body = ApiError)), tag = "admin")]
+pub async fn update_site(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(input): Json<SiteInput>,
+) -> Response {
+    if let Err(response) = require_admin(&state, &headers, true).await {
+        return response;
+    }
+    let parsed = url::Url::parse(&input.base_url);
+    if input
+        .presentation
+        .as_ref()
+        .is_some_and(|value| !value.is_valid())
+        || input.site_name.trim().is_empty()
+        || input.site_name.chars().count() > 80
+        || input
+            .description
+            .as_ref()
+            .is_some_and(|value| value.chars().count() > 500)
+        || !parsed
+            .as_ref()
+            .is_ok_and(|url| matches!(url.scheme(), "http" | "https") && url.host_str().is_some())
+    {
+        return error(StatusCode::BAD_REQUEST, "invalid_site", "站点设置无效");
+    }
+    let previous = match site_setting::Entity::find_by_id(1).one(&state.db).await {
+        Ok(row) => row,
+        Err(err) => {
+            tracing::error!(error = %err, "读取站点设置失败");
+            return error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "internal_error",
+                "服务暂时不可用",
+            );
+        }
+    };
+    let active_provider_id = previous
+        .as_ref()
+        .and_then(|row| row.active_provider_id.clone());
+    let active = site_setting::ActiveModel {
+        id: Set(1),
+        site_name: Set(input.site_name.trim().into()),
+        description: Set(input.description),
+        base_url: Set(input.base_url.trim_end_matches('/').into()),
+        presentation: Set(input
+            .presentation
+            .map(|value| serde_json::to_value(value).expect("公开配置可序列化"))
+            .or_else(|| previous.as_ref().and_then(|row| row.presentation.clone()))),
+        active_provider_id: Set(active_provider_id),
+        updated_at: Set(chrono::Utc::now()),
+    };
+    let result = if previous.is_some() {
+        active.update(&state.db).await
+    } else {
+        active.insert(&state.db).await
+    };
+    match result {
+        Ok(row) => Json(SiteResponse {
+            site_name: row.site_name,
+            description: row.description,
+            base_url: row.base_url,
+            presentation: row
+                .presentation
+                .and_then(|value| serde_json::from_value(value).ok())
+                .unwrap_or_default(),
+        })
+        .into_response(),
+        Err(err) => {
+            tracing::error!(error = %err, "保存站点设置失败");
+            error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "internal_error",
+                "服务暂时不可用",
+            )
+        }
+    }
+}
+
+/// 新建分类。
+#[utoipa::path(post, path = "/api/v1/admin/categories", request_body = TaxonomyInput, responses((status = 201, body = TaxonomyResponse), (status = 400, body = ApiError), (status = 409, body = ApiError)), tag = "admin")]
+pub async fn create_category(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(input): Json<TaxonomyInput>,
+) -> Response {
+    if let Err(response) = require_admin(&state, &headers, true).await {
+        return response;
+    }
+    if !valid_taxonomy(&input) {
+        return error(StatusCode::BAD_REQUEST, "invalid_taxonomy", "分类内容无效");
+    }
+    match category::Entity::find()
+        .filter(category::Column::Slug.eq(&input.slug))
+        .one(&state.db)
+        .await
+    {
+        Ok(Some(_)) => return error(StatusCode::CONFLICT, "slug_conflict", "slug 已存在"),
+        Err(err) => {
+            tracing::error!(error = %err, "检查分类失败");
+            return error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "internal_error",
+                "服务暂时不可用",
+            );
+        }
+        _ => {}
+    }
+    match (category::ActiveModel {
+        name: Set(input.name.trim().into()),
+        slug: Set(input.slug),
+        ..Default::default()
+    })
+    .insert(&state.db)
+    .await
+    {
+        Ok(row) => (
+            StatusCode::CREATED,
+            Json(TaxonomyResponse {
+                name: row.name,
+                slug: row.slug,
+            }),
+        )
+            .into_response(),
+        Err(err) => {
+            tracing::error!(error = %err, "创建分类失败");
+            error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "internal_error",
+                "服务暂时不可用",
+            )
+        }
+    }
+}
+
+/// 更新分类名称或 slug。
+#[utoipa::path(put, path = "/api/v1/admin/categories/{slug}", params(("slug" = String, Path)), request_body = TaxonomyInput, responses((status = 200, body = TaxonomyResponse), (status = 404, body = ApiError)), tag = "admin")]
+pub async fn update_category(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(slug): Path<String>,
+    Json(input): Json<TaxonomyInput>,
+) -> Response {
+    if let Err(response) = require_admin(&state, &headers, true).await {
+        return response;
+    }
+    if !valid_taxonomy(&input) {
+        return error(StatusCode::BAD_REQUEST, "invalid_taxonomy", "分类内容无效");
+    }
+    let row = match category::Entity::find()
+        .filter(category::Column::Slug.eq(slug))
+        .one(&state.db)
+        .await
+    {
+        Ok(Some(row)) => row,
+        Ok(None) => return error(StatusCode::NOT_FOUND, "category_not_found", "分类不存在"),
+        Err(err) => {
+            tracing::error!(error = %err, "读取分类失败");
+            return error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "internal_error",
+                "服务暂时不可用",
+            );
+        }
+    };
+    let mut active = row.into_active_model();
+    active.name = Set(input.name.trim().into());
+    active.slug = Set(input.slug);
+    match active.update(&state.db).await {
+        Ok(row) => Json(TaxonomyResponse {
+            name: row.name,
+            slug: row.slug,
+        })
+        .into_response(),
+        Err(err) => {
+            tracing::error!(error = %err, "更新分类失败");
+            error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "internal_error",
+                "服务暂时不可用",
+            )
+        }
+    }
+}
+
+/// 删除无文章关联的分类；数据库外键阻止破坏引用。
+#[utoipa::path(delete, path = "/api/v1/admin/categories/{slug}", params(("slug" = String, Path)), responses((status = 204), (status = 409, body = ApiError)), tag = "admin")]
+pub async fn delete_category(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(slug): Path<String>,
+) -> Response {
+    if let Err(response) = require_admin(&state, &headers, true).await {
+        return response;
+    }
+    match category::Entity::delete_many()
+        .filter(category::Column::Slug.eq(slug))
+        .exec(&state.db)
+        .await
+    {
+        Ok(result) if result.rows_affected > 0 => StatusCode::NO_CONTENT.into_response(),
+        Ok(_) => error(StatusCode::NOT_FOUND, "category_not_found", "分类不存在"),
+        Err(_) => error(StatusCode::CONFLICT, "taxonomy_in_use", "分类仍被文章使用"),
+    }
+}
+
+/// 新建标签。
+#[utoipa::path(post, path = "/api/v1/admin/tags", request_body = TaxonomyInput, responses((status = 201, body = TaxonomyResponse), (status = 400, body = ApiError)), tag = "admin")]
+pub async fn create_tag(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(input): Json<TaxonomyInput>,
+) -> Response {
+    if let Err(response) = require_admin(&state, &headers, true).await {
+        return response;
+    }
+    if !valid_taxonomy(&input) {
+        return error(StatusCode::BAD_REQUEST, "invalid_taxonomy", "标签内容无效");
+    }
+    match tag::Entity::find()
+        .filter(tag::Column::Slug.eq(&input.slug))
+        .one(&state.db)
+        .await
+    {
+        Ok(Some(_)) => return error(StatusCode::CONFLICT, "slug_conflict", "slug 已存在"),
+        Err(err) => {
+            tracing::error!(error = %err, "检查标签失败");
+            return error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "internal_error",
+                "服务暂时不可用",
+            );
+        }
+        _ => {}
+    }
+    match (tag::ActiveModel {
+        name: Set(input.name.trim().into()),
+        slug: Set(input.slug),
+        ..Default::default()
+    })
+    .insert(&state.db)
+    .await
+    {
+        Ok(row) => (
+            StatusCode::CREATED,
+            Json(TaxonomyResponse {
+                name: row.name,
+                slug: row.slug,
+            }),
+        )
+            .into_response(),
+        Err(err) => {
+            tracing::error!(error = %err, "创建标签失败");
+            error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "internal_error",
+                "服务暂时不可用",
+            )
+        }
+    }
+}
+
+/// 更新标签名称和 slug。
+#[utoipa::path(put, path = "/api/v1/admin/tags/{slug}", params(("slug" = String, Path)), request_body = TaxonomyInput, responses((status = 200, body = TaxonomyResponse), (status = 404, body = ApiError)), tag = "admin")]
+pub async fn update_tag(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(slug): Path<String>,
+    Json(input): Json<TaxonomyInput>,
+) -> Response {
+    if let Err(response) = require_admin(&state, &headers, true).await {
+        return response;
+    }
+    if !valid_taxonomy(&input) {
+        return error(StatusCode::BAD_REQUEST, "invalid_taxonomy", "标签内容无效");
+    }
+    let row = match tag::Entity::find()
+        .filter(tag::Column::Slug.eq(slug))
+        .one(&state.db)
+        .await
+    {
+        Ok(Some(row)) => row,
+        Ok(None) => return error(StatusCode::NOT_FOUND, "tag_not_found", "标签不存在"),
+        Err(err) => {
+            tracing::error!(error = %err, "读取标签失败");
+            return error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "internal_error",
+                "服务暂时不可用",
+            );
+        }
+    };
+    let mut active = row.into_active_model();
+    active.name = Set(input.name.trim().into());
+    active.slug = Set(input.slug);
+    match active.update(&state.db).await {
+        Ok(row) => Json(TaxonomyResponse {
+            name: row.name,
+            slug: row.slug,
+        })
+        .into_response(),
+        Err(err) => {
+            tracing::error!(error = %err, "更新标签失败");
+            error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "internal_error",
+                "服务暂时不可用",
+            )
+        }
+    }
+}
+
+/// 删除无文章关联的标签。
+#[utoipa::path(delete, path = "/api/v1/admin/tags/{slug}", params(("slug" = String, Path)), responses((status = 204), (status = 409, body = ApiError)), tag = "admin")]
+pub async fn delete_tag(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(slug): Path<String>,
+) -> Response {
+    if let Err(response) = require_admin(&state, &headers, true).await {
+        return response;
+    }
+    match tag::Entity::delete_many()
+        .filter(tag::Column::Slug.eq(slug))
+        .exec(&state.db)
+        .await
+    {
+        Ok(result) if result.rows_affected > 0 => StatusCode::NO_CONTENT.into_response(),
+        Ok(_) => error(StatusCode::NOT_FOUND, "tag_not_found", "标签不存在"),
+        Err(_) => error(StatusCode::CONFLICT, "taxonomy_in_use", "标签仍被文章使用"),
+    }
+}

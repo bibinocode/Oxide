@@ -1,0 +1,13 @@
+- 禁止写SQL，全部采用 SeaORM2.0版本：https://www.sea-ql.org/SeaORM/zh-CN/docs/introduction/whats-new/
+- Web框架采用 Axum0.8.9 版本： https://docs.rs/axum/latest/axum/
+- 数据库使用 PostgerSQL
+- 缓存使用 Redis
+- 保证代码质量，Cargo 版本 1.96.0
+- 保证代码注释（中文），要求注释详细，包括函数、结构、枚举等，保持高代码可读性，可维护性，最低内存占用
+- 界面设计参考 [cali.so](https://cali.so/) PC端优先，移动端次之，Github 仓库地址：https://github.com/CaliCastle/cali.so/tree/dev
+- 使用 jieba-rs 进行分词，Tantivy 进行持久化搜索索引
+- Web 界面使用 React + TanStack Start，负责公开页面和管理端的路由、SSR 与交互；Axum 负责 API、RSS 和素材访问
+- 前端 lint 与格式化使用 Oxc 生态的 oxlint、oxfmt，并执行 TypeScript 类型检查
+- 前端建立可维护的设计变量与语义组件体系，按路由、功能组件、通用组件和 Hook 组织代码；具体边界见 docs/architecture.md
+- CSS 使用 Tailwind CSS 4，设计 token 集中维护，组件样式优先使用语义化工具类和受控变体
+- 保持 DDD 架构，将业务逻辑、数据访问、领域模型等分层，保持代码可维护性和可扩展性

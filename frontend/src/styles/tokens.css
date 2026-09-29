@@ -1,0 +1,41 @@
+@theme inline {
+  --font-sans: "Geist", "Noto Sans SC", system-ui, sans-serif;
+  --font-serif: "Geist", "Noto Sans SC", system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, monospace;
+  --color-ink: var(--page-text);
+  --color-muted: var(--page-subtle);
+  --color-line: var(--page-line);
+  --color-paper: var(--page-paper);
+  --color-surface: var(--page-bg);
+  --color-accent: var(--page-accent);
+  --color-warm: var(--page-warm);
+  --radius-panel: 3px;
+}
+
+:root {
+  --page-bg: #fbfaf7;
+  --page-paper: #f7f6f2;
+  --page-text: #34312e;
+  --page-body: #5d5954;
+  --page-subtle: #77736e;
+  --page-line: #dcd9d3;
+  --page-accent: #34312e;
+  --page-warm: #aa563d;
+  --page-signal: #c96a40;
+  --page-width: 600px;
+  --page-content-width: 552px;
+  --ease-swift: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page-bg: #1d2020;
+  --page-paper: #252a29;
+  --page-text: #e8ebe5;
+  --page-body: #c3cbc5;
+  --page-subtle: #aab3ad;
+  --page-line: #414a45;
+  --page-accent: #d7e2d7;
+  --page-warm: #e79f82;
+  --page-signal: #e5a765;
+}
