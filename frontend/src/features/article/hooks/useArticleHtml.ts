@@ -1,36 +1,5 @@
 import { useEffect, useState } from "react";
-
-type Highlighter = Awaited<ReturnType<typeof import("shiki").createHighlighter>>;
-let highlighterPromise: Promise<Highlighter> | null = null;
-
-/** 语法文件按需加载并共享实例，正文没有代码时不下载高亮器。 */
-function getHighlighter() {
-  highlighterPromise ??= import("shiki")
-    .then(({ createHighlighter }) =>
-      createHighlighter({
-        themes: ["github-light", "github-dark"],
-        langs: [
-          "bash",
-          "css",
-          "html",
-          "javascript",
-          "json",
-          "markdown",
-          "python",
-          "rust",
-          "sql",
-          "typescript",
-          "yaml",
-          "toml",
-        ],
-      }),
-    )
-    .catch((error) => {
-      highlighterPromise = null;
-      throw error;
-    });
-  return highlighterPromise;
-}
+import { getCodeHighlighter, codeLanguage } from "../../../lib/codeHighlighter";
 
 /** 公开页和编辑预览共享代码纸张、高亮及复制按钮，过期任务不能覆盖当前正文。 */
 export function useArticleHtml(html: string) {
@@ -59,12 +28,13 @@ export function useArticleHtml(html: string) {
     }
     async function enhance() {
       if (html.includes("<pre")) {
-        const highlighter = await getHighlighter();
+        const highlighter = await getCodeHighlighter();
         if (cancelled) return;
         for (const code of document.querySelectorAll("pre > code")) {
           const language =
             [...code.classList].find((name) => name.startsWith("language-"))?.slice(9) ?? "text";
-          const lang = highlighter.getLoadedLanguages().includes(language) ? language : "text";
+          const normalized = codeLanguage(language);
+          const lang = highlighter.getLoadedLanguages().includes(normalized) ? normalized : "text";
           const frame = document.createElement("figure");
           frame.className = "article-code-frame";
           const bar = document.createElement("figcaption");

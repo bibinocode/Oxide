@@ -154,7 +154,10 @@
 @media (min-width: 960px) {
   .markdown-editor .editor-workspace {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, var(--editor-split, 50%)) 6px minmax(0, 1fr);
+  }
+  .markdown-editor .editor-workspace[data-preview="false"] {
+    grid-template-columns: minmax(0, 1fr);
   }
   .markdown-editor .editor-pane {
     display: block !important;
@@ -164,7 +167,52 @@
     display: none;
   }
 }
+/* 编辑主区与对话侧栏各自滚动，预览隐藏时将空间完整还给源码。 */
+.editor-writing-layout {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.editor-writing-layout > .editor-workspace {
+  min-width: 0;
+}
+.editor-resize-handle {
+  position: relative;
+  z-index: 2;
+  cursor: col-resize;
+  touch-action: none;
+  background: var(--page-bg);
+}
+.editor-resize-handle:hover,
+.editor-resize-handle:focus-visible {
+  background: var(--page-line);
+  outline: none;
+}
+.markdown-view-controls {
+  display: flex;
+  gap: 6px;
+  flex: none;
+}
+.markdown-view-controls button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 6px;
+  padding: 6px 9px;
+  color: var(--page-subtle);
+  font-size: 12px;
+}
+.markdown-view-controls button:hover,
+.markdown-view-controls button[aria-pressed="true"] {
+  background: var(--color-paper);
+  color: var(--page-text);
+}
 @media (max-width: 959px) {
+  .editor-resize-handle {
+    display: none;
+  }
   .markdown-editor .editor-view-switch {
     display: flex;
     align-self: flex-start;

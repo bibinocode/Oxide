@@ -1,11 +1,20 @@
 import { ApiRequestError } from "../../lib/api/client";
 
-type WritingEvent = "delta" | "done" | "error";
+type WritingEvent = "delta" | "done" | "error" | "reasoning" | "tool" | "status";
+
+/** 只呈现服务端真实事件，不将普通文本推测为工具调用或思考过程。 */
+export interface WritingProgress {
+  id: string;
+  kind: "reasoning" | "tool" | "status";
+  content: string;
+  delta?: boolean;
+}
 
 /** POST SSE 使用标准 fetch，以便发送 CSRF 头并支持 AbortController。 */
 export async function readWritingStream(
   response: Response,
   onDelta: (text: string) => void,
+  onProgress?: (progress: WritingProgress) => void,
 ): Promise<string> {
   if (!response.ok) {
     const failure = await response.json().catch(() => null);
@@ -33,10 +42,23 @@ export async function readWritingStream(
         const event = frame.match(/^event: (.+)$/m)?.[1] as WritingEvent | undefined;
         const data = frame.match(/^data: (.+)$/m)?.[1];
         if (event && data) {
-          const payload = JSON.parse(data) as { content?: string; message?: string };
+          const payload = JSON.parse(data) as {
+            content?: string;
+            message?: string;
+            id?: string;
+            delta?: boolean;
+          };
           if (event === "delta") onDelta(payload.content ?? "");
           if (event === "error") throw new Error(payload.message ?? "写作生成失败");
           if (event === "done") return payload.content ?? "";
+          if (event === "reasoning" || event === "tool" || event === "status") {
+            onProgress?.({
+              id: payload.id ?? event,
+              kind: event,
+              content: payload.content ?? payload.message ?? "",
+              delta: payload.delta,
+            });
+          }
         }
         boundary = buffer.indexOf("\n\n");
       }

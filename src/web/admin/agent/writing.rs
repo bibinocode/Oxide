@@ -17,7 +17,7 @@ use tokio_stream::wrappers::ReceiverStream;
 use utoipa::ToSchema;
 
 use crate::{
-    agent::writing::{self, WritingAction},
+    agent::writing::{self, WritingAction, WritingHistoryMessage, WritingRole},
     domain::agent::AgentTask,
     entity::agent_provider,
     infrastructure::agent as agent_runtime,
@@ -39,6 +39,9 @@ pub struct WritingInput {
     pub before: String,
     /// 选区后的有限上下文。
     pub after: String,
+    /// 有界多轮对话历史；旧客户端可以省略。
+    #[serde(default)]
+    pub history: Vec<WritingHistoryMessage>,
 }
 
 /// 待管理员核对差异后采纳的 Markdown 候选。
@@ -59,6 +62,13 @@ async fn prepare(
     state: &AppState,
     input: &WritingInput,
 ) -> Result<(String, agent_provider::Model), Response> {
+    writing::validate_history(&input.history).map_err(|_| {
+        error(
+            StatusCode::BAD_REQUEST,
+            "invalid_writing_history",
+            "对话历史无效或过长",
+        )
+    })?;
     let prompt = writing::prompt(
         input.action,
         &input.instruction,
@@ -153,10 +163,30 @@ pub async fn stream(
         Err(response) => return response,
     };
     let secret = state.comment_hash_key.clone();
+    let history = input
+        .history
+        .into_iter()
+        .map(|message| match message.role {
+            WritingRole::User => rig::completion::Message::user(message.content),
+            WritingRole::Assistant => rig::completion::Message::assistant(message.content),
+        })
+        .collect();
     let (events_tx, events_rx) = mpsc::channel::<Result<Event, Infallible>>(32);
     tokio::spawn(async move {
-        let (delta_tx, mut delta_rx) = mpsc::channel::<String>(32);
-        let model = tokio::spawn(async move {
+        let (delta_tx, mut delta_rx) = mpsc::channel::<agent_runtime::TextStreamEvent>(32);
+        if events_tx
+            .send(Ok(Event::default()
+                .event("status")
+                .json_data(
+                    serde_json::json!({"id": "model", "content": "已连接写作任务，正在请求模型"}),
+                )
+                .expect("固定状态事件可序列化")))
+            .await
+            .is_err()
+        {
+            return;
+        }
+        let mut model = tokio::spawn(async move {
             agent_runtime::stream_text(
                 &provider,
                 &secret,
@@ -164,13 +194,19 @@ pub async fn stream(
                 prompt,
                 writing::GENERATION_OPTIONS,
                 delta_tx,
+                history,
             )
             .await
         });
-        while let Some(delta) = delta_rx.recv().await {
-            let event = Event::default()
-                .event("delta")
-                .json_data(WritingEvent { content: &delta });
+        loop {
+            let delta = tokio::select! {
+                _ = events_tx.closed() => { model.abort(); return; }
+                delta = delta_rx.recv() => delta,
+            };
+            let Some(delta) = delta else {
+                break;
+            };
+            let event = Event::default().event(delta.event_name()).json_data(delta);
             if let Ok(event) = event
                 && events_tx.send(Ok(event)).await.is_err()
             {
@@ -178,7 +214,10 @@ pub async fn stream(
                 return;
             }
         }
-        let outcome = model.await;
+        let outcome = tokio::select! {
+            _ = events_tx.closed() => { model.abort(); return; }
+            outcome = &mut model => outcome,
+        };
         let event = match outcome {
             Ok(Ok(text)) => match writing::validate_output(&text) {
                 Ok(content) => Event::default()

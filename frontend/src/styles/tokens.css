@@ -25,6 +25,12 @@
   --page-width: 600px;
   --page-content-width: 552px;
   --ease-swift: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --editor-chat-width: 400px;
+  --editor-code-font: "Geist Mono", ui-monospace, monospace;
+  --editor-assistant-radius: 18px;
+  --editor-assistant-shadow: 0 8px 32px rgb(0 0 0 / 8%);
+  --editor-diff-added: color-mix(in srgb, #70b7e5 24%, var(--page-bg));
+  --editor-diff-removed: color-mix(in srgb, #df6358 18%, var(--page-bg));
 }
 
 :root[data-theme="dark"] {

@@ -44,7 +44,7 @@ class ReviewWidget extends WidgetType {
     heading.textContent = this.review.pending
       ? "AI 正在写作…"
       : this.review.complete
-        ? "AI 候选"
+        ? "我已完成你提出的编辑。"
         : "AI 写作";
     root.append(heading);
 
@@ -54,8 +54,8 @@ class ReviewWidget extends WidgetType {
     for (const part of diffWordsWithSpace(original, this.review.candidate)) {
       const span = document.createElement("span");
       span.textContent = part.value;
-      if (part.added) span.className = "writing-diff-added";
-      if (part.removed) span.className = "writing-diff-removed";
+      if (part.added && this.review.action === "improve") span.className = "writing-diff-added";
+      if (part.removed && this.review.action === "improve") span.className = "writing-diff-removed";
       diff.append(span);
     }
     if (!this.review.candidate) diff.textContent = "等待模型输出…";
@@ -66,7 +66,9 @@ class ReviewWidget extends WidgetType {
     if (this.review.action !== "explain") {
       const accept = document.createElement("button");
       accept.type = "button";
-      accept.textContent = "采纳";
+      accept.textContent = "✓";
+      accept.setAttribute("aria-label", "采纳");
+      accept.title = "采纳修改";
       accept.disabled =
         !this.review.complete || this.review.changed || !this.review.candidate.trim();
       accept.addEventListener("click", () => this.actions.current.accept());
@@ -74,10 +76,12 @@ class ReviewWidget extends WidgetType {
     }
     const dismiss = document.createElement("button");
     dismiss.type = "button";
-    dismiss.textContent = "放弃";
+    dismiss.textContent = "↶";
+    dismiss.setAttribute("aria-label", "放弃修改");
+    dismiss.title = "放弃修改";
     dismiss.addEventListener("click", () => this.actions.current.close());
     actions.append(dismiss);
-    root.append(actions);
+    heading.append(actions);
     return root;
   }
 }
@@ -95,19 +99,14 @@ export function writingReviewExtension(actions: { current: WritingReviewActions 
     },
     provide: (field) =>
       EditorView.decorations.from(field, (review) => {
-        if (!review) return Decoration.none;
+        if (!review || (review.action !== "improve" && review.action !== "continue"))
+          return Decoration.none;
         const marks = [];
-        if (review.action === "improve" && review.from < review.to) {
-          marks.push(
-            Decoration.mark({ class: "writing-original-removed" }).range(review.from, review.to),
-          );
-        }
+        const widget = new ReviewWidget(review, actions);
         marks.push(
-          Decoration.widget({
-            widget: new ReviewWidget(review, actions),
-            block: true,
-            side: 1,
-          }).range(review.to),
+          review.action === "improve" && review.candidate && review.from < review.to
+            ? Decoration.replace({ widget, block: true }).range(review.from, review.to)
+            : Decoration.widget({ widget, block: true, side: 1 }).range(review.to),
         );
         return Decoration.set(marks, true);
       }),

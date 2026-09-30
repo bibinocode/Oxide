@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import CodeMirror from "@uiw/react-codemirror";
 import { markdown } from "@codemirror/lang-markdown";
 import { EditorView } from "@codemirror/view";
-import { ArrowLeft, History, Save, Trash2 } from "lucide-react";
+import { ArrowLeft, History, Save, Trash2, PanelRight, Sparkles } from "lucide-react";
 import { csrfHeaders, useAdminSession } from "../../admin/AdminSession";
 import { ArticlePresentation } from "../../article/components/ArticlePresentation";
 import { apiRequest } from "../../../lib/api/client";
@@ -14,7 +14,8 @@ import { PublishPanel, type CoverSelection } from "./PublishPanel";
 import { useArticlePreview } from "../hooks/useArticlePreview";
 import { htmlToMarkdown } from "../htmlToMarkdown";
 import { useWritingAssistant } from "../hooks/useWritingAssistant";
-import { WritingAssistant } from "./WritingAssistant";
+import { WritingAssistant, WritingSelectionActions } from "./WritingAssistant";
+import { ResizeHandle } from "./ResizeHandle";
 import { ThemeControl } from "../../../components/layout/ThemeControl";
 
 const editorExtensions = [
@@ -43,6 +44,9 @@ export function ArticleEditor({ publicId }: { publicId?: string }) {
   const navigate = useNavigate();
   const editorView = useRef<EditorView | null>(null);
   const writing = useWritingAssistant(editorView);
+  const workspace = useRef<HTMLDivElement>(null);
+  const [previewVisible, setPreviewVisible] = useState(true);
+  const [split, setSplit] = useState(50);
   const imageInput = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
@@ -66,6 +70,31 @@ export function ArticleEditor({ publicId }: { publicId?: string }) {
   >([]);
   const { html: previewHtml, error: previewError } = useArticlePreview(source, session);
   const lines = source ? source.split("\n").length : 1;
+
+  useEffect(() => {
+    try {
+      const preference = JSON.parse(localStorage.getItem("oxide.editor.layout") ?? "null") as {
+        preview?: boolean;
+        split?: number;
+      } | null;
+      if (typeof preference?.preview === "boolean") setPreviewVisible(preference.preview);
+      if (typeof preference?.split === "number" && Number.isFinite(preference.split))
+        setSplit(Math.max(20, Math.min(80, preference.split)));
+    } catch {
+      /* 无效或禁用的本地存储不影响编辑。 */
+    }
+  }, []);
+
+  /** 只保存布局偏好，不将文章正文或对话写入浏览器存储。 */
+  function rememberLayout(preview: boolean, width: number) {
+    setPreviewVisible(preview);
+    setSplit(width);
+    try {
+      localStorage.setItem("oxide.editor.layout", JSON.stringify({ preview, split: width }));
+    } catch {
+      /* 隐私模式下保持本次会话的布局即可。 */
+    }
+  }
 
   useEffect(() => {
     Promise.all([
@@ -390,7 +419,28 @@ export function ArticleEditor({ publicId }: { publicId?: string }) {
       </header>
       <div className="markdown-tool-row">
         <EditorToolbar onCommand={format} />
-        <span className="markdown-format-label">MARKDOWN</span>
+        <div className="markdown-view-controls">
+          <button
+            type="button"
+            aria-pressed={previewVisible}
+            onClick={() => {
+              rememberLayout(!previewVisible, split);
+              setView("edit");
+            }}
+            title={previewVisible ? "隐藏预览" : "显示预览"}
+          >
+            <PanelRight size={16} />
+            {previewVisible ? "隐藏预览" : "显示预览"}
+          </button>
+          <button
+            type="button"
+            aria-pressed={writing.panelOpen}
+            onClick={() => writing.setPanelOpen(!writing.panelOpen)}
+          >
+            <Sparkles size={16} />
+            AI 对话
+          </button>
+        </div>
       </div>
       <input
         ref={imageInput}
@@ -407,44 +457,69 @@ export function ArticleEditor({ publicId }: { publicId?: string }) {
         <button type="button" aria-pressed={view === "edit"} onClick={() => setView("edit")}>
           源码
         </button>
-        <button type="button" aria-pressed={view === "preview"} onClick={() => setView("preview")}>
+        <button
+          type="button"
+          aria-pressed={view === "preview"}
+          onClick={() => {
+            setPreviewVisible(true);
+            setView("preview");
+          }}
+        >
           预览
         </button>
       </div>
-      <div className="editor-workspace">
-        <div className="editor-pane editor-edit-pane markdown-source">
-          <WritingAssistant assistant={writing} />
-          <CodeMirror
-            value={source}
-            height="100%"
-            extensions={[...editorExtensions, ...writing.extensions]}
-            basicSetup={{
-              lineNumbers: false,
-              foldGutter: false,
-              highlightActiveLine: false,
-              highlightActiveLineGutter: false,
-            }}
-            onCreateEditor={(view) => {
-              editorView.current = view;
-            }}
-            onChange={setSource}
-            aria-label="Markdown 正文"
-            placeholder="从这里开始写作..."
-          />
-        </div>
-        <aside className="editor-pane editor-preview-pane" aria-label="实时预览">
-          <div className="editor-preview-content">
-            <div>
-              <ArticlePresentation
-                title={title}
-                summary={summary || null}
-                publishedAt={publishedAt}
-                html={previewHtml}
-                coverUrl={cover.media_url}
-              />
-            </div>
+      <div className="editor-writing-layout">
+        <div
+          className="editor-workspace"
+          ref={workspace}
+          data-preview={previewVisible}
+          style={{ "--editor-split": split + "%" } as CSSProperties}
+        >
+          <div className="editor-pane editor-edit-pane markdown-source">
+            <WritingSelectionActions assistant={writing} />
+            <CodeMirror
+              value={source}
+              height="100%"
+              extensions={[...editorExtensions, ...writing.extensions]}
+              basicSetup={{
+                lineNumbers: false,
+                foldGutter: false,
+                highlightActiveLine: false,
+                highlightActiveLineGutter: false,
+              }}
+              onCreateEditor={(view) => {
+                editorView.current = view;
+              }}
+              onChange={setSource}
+              aria-label="Markdown 正文"
+              placeholder="从这里开始写作..."
+            />
           </div>
-        </aside>
+          {previewVisible && (
+            <>
+              <ResizeHandle
+                label="调整源码和预览宽度"
+                value={split}
+                onChange={(width) => rememberLayout(previewVisible, width)}
+                container={workspace}
+              />
+              <aside className="editor-pane editor-preview-pane" aria-label="实时预览">
+                <div className="editor-preview-content">
+                  <div>
+                    <ArticlePresentation
+                      title={title}
+                      summary={summary || null}
+                      publishedAt={publishedAt}
+                      html={previewHtml}
+                      coverUrl={cover.media_url}
+                    />
+                  </div>
+                </div>
+              </aside>
+            </>
+          )}
+        </div>
+        <WritingAssistant assistant={writing} />
       </div>
       <footer className="markdown-statusbar">
         <span>
