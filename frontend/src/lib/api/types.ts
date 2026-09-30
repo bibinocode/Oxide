@@ -135,3 +135,58 @@ export interface ApiError {
   code: string;
   message: string;
 }
+
+/** 标准技能包的发现元数据，不包含指令与附属文件正文。 */
+export interface SkillSummary {
+  name: string;
+  description: string;
+  enabled: boolean;
+  manual_only: boolean;
+  license: string | null;
+  compatibility: string | null;
+  warnings: string[];
+}
+
+export interface SkillCatalog {
+  skills: SkillSummary[];
+  warnings: string[];
+}
+
+/** 原始 SKILL.md 与全部配套文件的轻量目录。 */
+export interface SkillDetail {
+  skill: SkillSummary;
+  document: string;
+  files: { path: string; size: number }[];
+  source: string | null;
+}
+/** 网络搜索的非敏感配置；密钥仅由服务器环境提供。 */
+export interface WebSearchSettings {
+  enabled: boolean;
+  tasks: string[];
+  search_engine: "search_std" | "search_pro" | "search_pro_sogou" | "search_pro_quark";
+  count: number;
+  search_recency_filter: "oneDay" | "oneWeek" | "oneMonth" | "oneYear" | "noLimit";
+  content_size: "medium" | "high";
+  search_domain_filter: string | null;
+}
+export interface AgentToolDescriptor {
+  name: string;
+  title: string;
+  description: string;
+  configured: boolean;
+  settings: WebSearchSettings;
+  input_schema: unknown;
+}
+export interface WebSearchResponse {
+  query: string;
+  request_id: string;
+  results: {
+    title: string;
+    content: string;
+    url: string;
+    source: string;
+    reference: string;
+    publish_date: string | null;
+    truncated: boolean;
+  }[];
+}

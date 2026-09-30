@@ -15,6 +15,7 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as ArchiveRouteImport } from './routes/archive'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as AdminAgentRouteImport } from './routes/admin.agent'
 import { Route as AdminAssetsRouteImport } from './routes/admin.assets'
 import { Route as AdminCommentsRouteImport } from './routes/admin.comments'
 import { Route as AdminNotionRouteImport } from './routes/admin.notion'
@@ -53,6 +54,11 @@ const SearchRoute = SearchRouteImport.update({
 const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAgentRoute = AdminAgentRouteImport.update({
+  id: '/agent',
+  path: '/agent',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminAssetsRoute = AdminAssetsRouteImport.update({
@@ -107,6 +113,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRouteWithChildren
   '/archive': typeof ArchiveRoute
   '/search': typeof SearchRoute
+  '/admin/agent': typeof AdminAgentRoute
   '/admin/assets': typeof AdminAssetsRoute
   '/admin/comments': typeof AdminCommentsRoute
   '/admin/notion': typeof AdminNotionRoute
@@ -123,6 +130,7 @@ export interface FileRoutesByTo {
   '/about': typeof AboutRoute
   '/archive': typeof ArchiveRoute
   '/search': typeof SearchRoute
+  '/admin/agent': typeof AdminAgentRoute
   '/admin/assets': typeof AdminAssetsRoute
   '/admin/comments': typeof AdminCommentsRoute
   '/admin/notion': typeof AdminNotionRoute
@@ -141,6 +149,7 @@ export interface FileRoutesById {
   '/admin': typeof AdminRouteWithChildren
   '/archive': typeof ArchiveRoute
   '/search': typeof SearchRoute
+  '/admin/agent': typeof AdminAgentRoute
   '/admin/assets': typeof AdminAssetsRoute
   '/admin/comments': typeof AdminCommentsRoute
   '/admin/notion': typeof AdminNotionRoute
@@ -160,6 +169,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/archive'
     | '/search'
+    | '/admin/agent'
     | '/admin/assets'
     | '/admin/comments'
     | '/admin/notion'
@@ -176,6 +186,7 @@ export interface FileRouteTypes {
     | '/about'
     | '/archive'
     | '/search'
+    | '/admin/agent'
     | '/admin/assets'
     | '/admin/comments'
     | '/admin/notion'
@@ -193,6 +204,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/archive'
     | '/search'
+    | '/admin/agent'
     | '/admin/assets'
     | '/admin/comments'
     | '/admin/notion'
@@ -258,6 +270,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/admin/'
       preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/agent': {
+      id: '/admin/agent'
+      path: '/agent'
+      fullPath: '/admin/agent'
+      preLoaderRoute: typeof AdminAgentRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/assets': {
@@ -327,6 +346,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AdminRouteChildren {
+  AdminAgentRoute: typeof AdminAgentRoute
   AdminAssetsRoute: typeof AdminAssetsRoute
   AdminCommentsRoute: typeof AdminCommentsRoute
   AdminNotionRoute: typeof AdminNotionRoute
@@ -337,6 +357,7 @@ interface AdminRouteChildren {
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
+  AdminAgentRoute: AdminAgentRoute,
   AdminAssetsRoute: AdminAssetsRoute,
   AdminCommentsRoute: AdminCommentsRoute,
   AdminNotionRoute: AdminNotionRoute,

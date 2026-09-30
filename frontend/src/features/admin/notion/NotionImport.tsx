@@ -1,42 +1,19 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { ArrowUpRight, RefreshCw, Search } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { csrfHeaders, useAdminSession } from "../AdminSession";
 import { ApiRequestError, apiRequest } from "../../../lib/api/client";
-import type { NotionPage, NotionPageList, NotionSyncResult } from "../../../lib/api/types";
+import type { NotionPage, NotionSyncResult } from "../../../lib/api/types";
+import { useNotionPages } from "./hooks/useNotionPages";
 
 export function NotionImport() {
   const { session } = useAdminSession();
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const [pages, setPages] = useState<NotionPage[]>([]);
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { pages, cursor, loading, error, setError, load } = useNotionPages(searchTerm);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-
-  const load = useCallback(async (term: string, nextCursor?: string) => {
-    setLoading(true);
-    setError("");
-    try {
-      const params = new URLSearchParams();
-      if (term) params.set("q", term);
-      if (nextCursor) params.set("cursor", nextCursor);
-      const result = await apiRequest<NotionPageList>(`/api/v1/admin/notion/pages?${params}`);
-      setPages((previous) => (nextCursor ? [...previous, ...result.items] : result.items));
-      setCursor(result.next_cursor);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "读取 Notion 页面失败");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void load(searchTerm);
-  }, [load, searchTerm]);
 
   async function sync(page: NotionPage, force = false): Promise<void> {
     if (!session) return;

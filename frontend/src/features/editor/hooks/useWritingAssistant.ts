@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { EditorView } from "@codemirror/view";
 import { csrfHeaders, useAdminSession } from "../../admin/AdminSession";
+import { apiRequest } from "../../../lib/api/client";
 import { readWritingStream, type WritingProgress } from "../writingStream";
 import {
   setWritingReview,
@@ -28,6 +29,18 @@ export interface WritingMessage {
   content: string;
   progress: WritingProgress[];
   status: "streaming" | "done" | "stopped" | "error";
+  images?: WritingImage[];
+}
+/** 图片只在当前对话内存中保存，通过私密用户消息发送，不进入公开素材库。 */
+export interface WritingImage {
+  name: string;
+  mime_type: string;
+  data: string;
+}
+interface WritingCapabilities {
+  web_search_available: boolean;
+  image_supported: boolean;
+  model_id: string | null;
 }
 const labels = {
   draft: "使用 AI 编写…",
@@ -51,8 +64,25 @@ export function useWritingAssistant(viewRef: React.RefObject<EditorView | null>)
     input: () => undefined,
     generate: () => undefined,
     close: () => undefined,
+    hide: () => undefined,
     stop: () => undefined,
+    search: () => false,
+    searchAvailable: () => false,
+    toggleSearch: () => undefined,
+    openPanel: () => undefined,
+    snapshot: () => ({
+      instruction: "",
+      images: [],
+      reading: false,
+      pending: false,
+      imageSupported: false,
+      error: "",
+    }),
+    attachImages: async () => undefined,
+    removeImage: () => undefined,
+    subscribe: () => () => undefined,
   });
+  const promptListeners = useRef(new Set<() => void>());
   const commands = useRef({ open: (_action: WritingAction) => {}, documentChanged: () => {} });
   const [selection, setSelection] = useState("");
   const [selectionAnchor, setSelectionAnchor] = useState<{ left: number; top: number } | null>(
@@ -71,6 +101,72 @@ export function useWritingAssistant(viewRef: React.RefObject<EditorView | null>)
   const [panelOpen, setPanelOpen] = useState(false);
   const [mode, setMode] = useState<ConversationMode>("sidebar");
   const [inlineOpen, setInlineOpen] = useState(false);
+  const [capabilities, setCapabilities] = useState<WritingCapabilities | null>(null);
+  const [webSearch, setWebSearch] = useState(true);
+  const searchRef = useRef(true);
+  const capabilitiesRef = useRef<WritingCapabilities | null>(null);
+  const [images, setImages] = useState<WritingImage[]>([]);
+  const [readingImages, setReadingImages] = useState(false);
+  const readingRef = useRef(false);
+  useEffect(() => {
+    const active = new AbortController();
+    apiRequest<WritingCapabilities>("/api/v1/admin/agent/writing/capabilities", {
+      signal: active.signal,
+    })
+      .then((value) => {
+        if (!active.signal.aborted) {
+          capabilitiesRef.current = value;
+          setCapabilities(value);
+        }
+      })
+      .catch(() => {
+        if (!active.signal.aborted) setError("无法读取 AI 能力，请刷新后重试。");
+      });
+    return () => active.abort();
+  }, []);
+
+  function changeSearch(value: boolean) {
+    searchRef.current = value;
+    setWebSearch(value);
+  }
+  async function attachImages(files: File[]) {
+    if (!capabilitiesRef.current?.image_supported || pending || readingRef.current) return;
+    if (images.length + files.length > 3) {
+      setError("每条消息最多附加 3 张图片");
+      return;
+    }
+    readingRef.current = true;
+    setReadingImages(true);
+    setError("");
+    try {
+      const selected: WritingImage[] = [];
+      for (const file of files) {
+        if (
+          !["image/png", "image/jpeg", "image/gif", "image/webp"].includes(file.type) ||
+          file.size > 2 * 1024 * 1024 ||
+          file.name.length > 160
+        )
+          throw new Error("仅支持不超过 2 MiB 的 PNG、JPEG、GIF、WebP 图片");
+        const url = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result));
+          reader.onerror = () => reject(new Error("读取图片失败"));
+          reader.readAsDataURL(file);
+        });
+        selected.push({
+          name: file.name,
+          mime_type: file.type,
+          data: url.slice(url.indexOf(",") + 1),
+        });
+      }
+      setImages((old) => [...old, ...selected]);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "读取图片失败");
+    } finally {
+      readingRef.current = false;
+      setReadingImages(false);
+    }
+  }
 
   function updateInstruction(value: string) {
     instructionRef.current = value;
@@ -102,6 +198,7 @@ export function useWritingAssistant(viewRef: React.RefObject<EditorView | null>)
     closePrompt();
     setMessages([]);
     setError("");
+    setImages([]);
   }
 
   function open(next: WritingAction) {
@@ -127,9 +224,10 @@ export function useWritingAssistant(viewRef: React.RefObject<EditorView | null>)
   }
 
   async function generate() {
-    if (!session || pending || controller.current) return;
+    if (!session || pending || controller.current || readingRef.current) return;
     const requestedAction = inlineOpen && action ? action : "draft";
-    const prompt = instructionRef.current.trim();
+    const prompt =
+      instructionRef.current.trim() || (images.length ? "请描述并分析附加的图片。" : "");
     if (requestedAction === "draft" && !prompt) return;
     const view = viewRef.current;
     if (!view) return;
@@ -161,8 +259,18 @@ export function useWritingAssistant(viewRef: React.RefObject<EditorView | null>)
           (item.role === "assistant" || messages[index + 1]?.status === "done"),
       )
       .slice(-12)
-      .map(({ role, content }) => ({ role, content }));
-    while (history.reduce((total, item) => total + item.content.length, 0) > 40_000)
+      .map(({ role, content, images }) => ({ role, content, images: images ?? [] }));
+    const sentImages = images;
+    const imageCharacters = () =>
+      [...history.flatMap((item) => item.images), ...sentImages].reduce(
+        (total, item) => total + item.data.length,
+        0,
+      );
+    while (
+      history.length &&
+      (history.reduce((total, item) => total + item.content.length, 0) > 40_000 ||
+        imageCharacters() > 8 * 1024 * 1024)
+    )
       history.splice(0, 2);
     setMessages((items) => [
       ...items.slice(-38),
@@ -172,6 +280,7 @@ export function useWritingAssistant(viewRef: React.RefObject<EditorView | null>)
         content: prompt || labels[requestedAction].replace("…", ""),
         progress: [],
         status: "done",
+        images: sentImages,
       },
       { id: replyId, role: "assistant", content: "", progress: [], status: "streaming" },
     ]);
@@ -181,6 +290,7 @@ export function useWritingAssistant(viewRef: React.RefObject<EditorView | null>)
     setComplete(false);
     setCandidate("");
     setError("");
+    setImages([]);
     updateInstruction("");
     const updateReply = (update: (message: WritingMessage) => WritingMessage) =>
       setMessages((items) => items.map((item) => (item.id === replyId ? update(item) : item)));
@@ -197,6 +307,8 @@ export function useWritingAssistant(viewRef: React.RefObject<EditorView | null>)
           before: document.slice(Math.max(0, from - 6000), from),
           after: document.slice(to, to + 6000),
           history,
+          web_search: searchRef.current && !!capabilitiesRef.current?.web_search_available,
+          images: sentImages,
         }),
       });
       const content = await readWritingStream(
@@ -236,6 +348,7 @@ export function useWritingAssistant(viewRef: React.RefObject<EditorView | null>)
     } catch (cause) {
       if (requestId.current === current) {
         setError(cause instanceof Error ? cause.message : "写作生成失败");
+        setImages(sentImages);
         updateReply((item) => ({ ...item, status: "error" }));
       }
     } finally {
@@ -291,8 +404,33 @@ export function useWritingAssistant(viewRef: React.RefObject<EditorView | null>)
     input: updateInstruction,
     generate: () => void generate(),
     close: closePrompt,
+    hide: () => setInlineOpen(false),
     stop,
+    search: () => searchRef.current,
+    searchAvailable: () => !!capabilitiesRef.current?.web_search_available,
+    toggleSearch: () => changeSearch(!searchRef.current),
+    openPanel: () => setPanelOpen(true),
+    snapshot: () => ({
+      instruction,
+      images,
+      reading: readingImages,
+      pending,
+      imageSupported: !!capabilities?.image_supported,
+      error,
+    }),
+    attachImages,
+    removeImage: (index) => setImages((old) => old.filter((_, position) => index !== position)),
+    subscribe: (listener) => {
+      promptListeners.current.add(listener);
+      return () => {
+        promptListeners.current.delete(listener);
+      };
+    },
   };
+  /** 原位控件订阅同一份会话状态，附件和能力变化不重建输入框或丢失光标。 */
+  useEffect(() => {
+    for (const listener of promptListeners.current) listener();
+  }, [instruction, images, readingImages, pending, capabilities, webSearch, error]);
   commands.current = {
     open,
     documentChanged: () => {
@@ -308,7 +446,8 @@ export function useWritingAssistant(viewRef: React.RefObject<EditorView | null>)
     view.dispatch({
       effects: [
         setWritingPrompt.of(
-          origin &&
+          !panelOpen &&
+            origin &&
             (inlineOpen || (pending && (action === "draft" || action === "explain"))) &&
             !changed
             ? {
@@ -337,7 +476,7 @@ export function useWritingAssistant(viewRef: React.RefObject<EditorView | null>)
         ),
       ],
     });
-  }, [action, origin, inlineOpen, candidate, pending, complete, changed, viewRef]);
+  }, [action, origin, inlineOpen, panelOpen, candidate, pending, complete, changed, viewRef]);
   useEffect(() => () => controller.current?.abort(), []);
 
   const extensions = useMemo(
@@ -350,7 +489,7 @@ export function useWritingAssistant(viewRef: React.RefObject<EditorView | null>)
           setSelection(update.state.doc.sliceString(from, to));
           requestAnimationFrame(() => {
             if (!update.view.dom.isConnected) return;
-            const coordinates = update.view.coordsAtPos(to);
+            const coordinates = update.view.coordsAtPos(Math.min(to, update.view.state.doc.length));
             setSelectionAnchor(
               coordinates && from !== to
                 ? { left: coordinates.left, top: coordinates.bottom + 8 }
@@ -404,10 +543,21 @@ export function useWritingAssistant(viewRef: React.RefObject<EditorView | null>)
     changed,
     messages,
     panelOpen,
-    setPanelOpen,
+    setPanelOpen: (visible: boolean) => {
+      if (!visible) setInlineOpen(false);
+      setPanelOpen(visible);
+    },
     mode,
     setMode,
     inlineOpen,
+    capabilities,
+    webSearch,
+    setWebSearch: changeSearch,
+    images,
+    attachImages,
+    readingImages,
+    removeImage: (index: number) =>
+      setImages((old) => old.filter((_, position) => index !== position)),
     open,
     close: dismissReview,
     generate,

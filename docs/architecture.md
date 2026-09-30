@@ -143,7 +143,7 @@ docs/                     # 设计和部署文档
 
 ## 6. 关键流程
 
-AI 写作、FIM、配图和审核 Agent 的后续实施边界见 [AI 写作设计](ai-assistant.md)。当前独立 Agent 领域层定义任务及能力，`agent_providers` 注册模型，`agent_bindings` 指定写作、摘要、图像、对话模型；执行适配器、工具授权、Skill/MCP 生命周期仍按该边界扩展。公开模块配置通过 `site_settings.presentation` 保存，模型凭据不进入公开站点配置。
+AI 写作、FIM、配图和审核 Agent 的后续实施边界见 [AI 写作设计](ai-assistant.md)。当前独立 Agent 领域层定义任务及能力，`agent_providers` 注册模型，`agent_bindings` 指定写作、摘要、图像、对话模型。Skill 采用独立文件目录存储，通过 ZIP、文件夹和 GitHub 安装完整包，按需读取核心文档与配套资源，不进入数据库；实现与兼容性边界见 [文件型 Agent Skills](agent-skills.md)。脚本执行、通用工具授权与 MCP 后续独立扩展。公开模块配置通过 `site_settings.presentation` 保存，模型凭据不进入公开站点配置。
 
 ### 文章编辑与发布
 

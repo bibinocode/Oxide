@@ -37,11 +37,17 @@ pub struct WritingHistoryMessage {
     pub role: WritingRole,
     /// 已完成消息的文本，禁止夹带思考或工具过程。
     pub content: String,
+    /// 仅用户历史可包含有界图片，以便连续追问时保持视觉上下文。
+    #[serde(default)]
+    pub images: Vec<super::writing_image::WritingImage>,
 }
 
 /// 历史按消息数量、单条长度和总长度限制，避免长对话无限占用上下文。
 pub fn validate_history(history: &[WritingHistoryMessage]) -> Result<()> {
     if history.len() > 12
+        || history.iter().any(|message| {
+            matches!(message.role, WritingRole::Assistant) && !message.images.is_empty()
+        })
         || history.iter().any(|message| {
             message.content.trim().is_empty() || message.content.chars().count() > MAX_OUTPUT_CHARS
         })
@@ -103,6 +109,41 @@ pub fn prompt(
     ))
 }
 
+/// 从用户本轮指令提取第一条 HTTPS 链接；服务端仍需再次验证目标地址。
+pub fn article_url(instruction: &str) -> Option<String> {
+    let lower = instruction.to_lowercase();
+    if ![
+        "总结",
+        "概括",
+        "阅读",
+        "读这篇",
+        "知识点",
+        "摘要",
+        "翻译",
+        "summarize",
+        "read this",
+    ]
+    .iter()
+    .any(|keyword| lower.contains(keyword))
+    {
+        return None;
+    }
+    let start = instruction.find("https://")?;
+    let rest = &instruction[start..];
+    let end = rest
+        .find(|character: char| {
+            character.is_whitespace()
+                || matches!(
+                    character,
+                    ')' | ']' | '>' | '"' | '\'' | '。' | '，' | '）' | '】'
+                )
+        })
+        .unwrap_or(rest.len());
+    let candidate = rest[..end].trim_end_matches(['.', ',', ';', '!', '?']);
+    let url = url::Url::parse(candidate).ok()?;
+    (url.scheme() == "https" && url.host_str().is_some()).then(|| url.to_string())
+}
+
 /// 丢弃模型外围空白并阻止空白或无界候选进入编辑器。
 pub fn validate_output(output: &str) -> Result<String> {
     let value = output.trim();
@@ -136,6 +177,7 @@ mod tests {
         let message = WritingHistoryMessage {
             role: WritingRole::User,
             content: "上一轮问题".into(),
+            images: Vec::new(),
         };
         assert!(validate_history(&[]).is_ok());
         assert!(validate_history(std::slice::from_ref(&message)).is_ok());
@@ -149,16 +191,35 @@ mod tests {
         assert!(
             validate_history(&[WritingHistoryMessage {
                 role: WritingRole::Assistant,
-                content: "字".repeat(MAX_OUTPUT_CHARS + 1)
+                content: "字".repeat(MAX_OUTPUT_CHARS + 1),
+                images: Vec::new(),
             }])
             .is_err()
         );
         assert!(
             validate_history(&[WritingHistoryMessage {
                 role: WritingRole::User,
-                content: " ".into()
+                content: " ".into(),
+                images: Vec::new(),
             }])
             .is_err()
         );
+    }
+
+    #[test]
+    fn extracts_explicit_article_links_with_fragments() {
+        assert_eq!(
+            article_url(
+                "总结：[https://example.com/rag.html#section](https://example.com/rag.html#section)"
+            ),
+            Some("https://example.com/rag.html#section".into())
+        );
+        assert_eq!(article_url("没有链接"), None);
+        assert_eq!(
+            article_url("给文字添加链接 https://example.com/rag.html"),
+            None
+        );
+        assert!(article_url("读取并总结：https://javabetter.cn/sidebar/itwanger/paicli/build-agent-p4-rag.html#_01%E3%80%81rag-%E7%9A%84%E6%95%B4%E4%BD%93%E8%AE%BE%E8%AE%A1")
+            .is_some());
     }
 }

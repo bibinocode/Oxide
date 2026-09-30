@@ -8,6 +8,7 @@ import {
   MessageSquare,
   Settings,
   BookOpen,
+  Bot,
 } from "lucide-react";
 import { AdminSessionProvider, csrfHeaders, useAdminSession } from "../features/admin/AdminSession";
 import { apiRequest } from "../lib/api/client";
@@ -131,6 +132,13 @@ function AdminLayout() {
           </Link>
           <Link to="/admin/assets" activeProps={{ className: "is-active" }}>
             <Images size={17} /> 素材
+          </Link>
+          <Link
+            to="/admin/agent"
+            search={{ tab: "skills" }}
+            activeProps={{ className: "is-active" }}
+          >
+            <Bot size={17} /> Agent
           </Link>
           <Link to="/admin/settings" activeProps={{ className: "is-active" }}>
             <Settings size={17} /> 设置

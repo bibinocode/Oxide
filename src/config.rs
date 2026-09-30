@@ -7,6 +7,12 @@ use anyhow::{Context, Result, bail};
 /// 后端进程所需的连接和监听配置。
 #[derive(Clone)]
 pub struct Config {
+    /// 工具非敏感配置文件，密钥不写入此文件。
+    pub agent_tools_config: String,
+    /// 智谱网络搜索密钥，仅留在服务端，不记录日志或回传浏览器。
+    pub web_search_api_key: Option<String>,
+    /// 文件型 Skill 安装目录；包内容及管理状态不写数据库。
+    pub agent_skills_dir: String,
     /// PostgreSQL 连接地址，不允许写入日志。
     pub database_url: String,
     /// Redis 连接地址，不允许写入日志。
@@ -94,6 +100,11 @@ impl Config {
         }
 
         Ok(Self {
+            agent_tools_config: get("AGENT_TOOLS_CONFIG")
+                .unwrap_or_else(|| "./data/agent-tools.json".into()),
+            web_search_api_key: get("WEB_SEARCH_API_KEY").filter(|value| !value.trim().is_empty()),
+            agent_skills_dir: get("AGENT_SKILLS_DIR")
+                .unwrap_or_else(|| "./data/agent-skills".into()),
             database_url,
             redis_url,
             bind,

@@ -19,7 +19,16 @@ async fn main() -> Result<()> {
     let output = agent::generate_text(
         &provider,
         &config.comment_hash_key,
-        summary::SYSTEM_PROMPT,
+        &rust_oxide::agent::context::AgentContext::skills_only(
+            rust_oxide::agent::skills::SkillContext::discover(
+                std::sync::Arc::new(rust_oxide::infrastructure::agent_skills::SkillStore::new(
+                    std::path::PathBuf::from(config.agent_skills_dir),
+                )),
+                summary::SYSTEM_PROMPT,
+                "",
+            )
+            .await?,
+        ),
         prompt,
         summary::GENERATION_OPTIONS,
     )

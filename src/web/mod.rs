@@ -26,6 +26,10 @@ pub mod client;
 /// 各路由共享的外部资源及可替换文章仓储。
 #[derive(Clone)]
 pub struct AppState {
+    /// 真实 Agent 工具注册和任务级授权。
+    pub tools: Arc<crate::agent::tools::ToolRegistry>,
+    /// 文件型技能包仓库与独立的启停状态。
+    pub skills: Arc<crate::infrastructure::agent_skills::SkillStore>,
     /// 公开文章查询接口。
     pub articles: Arc<dyn ArticleRepository>,
     /// PostgreSQL 连接池，用于就绪探针。
@@ -148,7 +152,11 @@ pub struct HealthResponse {
         admin::agent::providers, admin::agent::create_provider, admin::agent::update_provider,
         admin::agent::delete_provider, admin::agent::bindings, admin::agent::bind_task,
         admin::agent::summary::generate, admin::agent::writing::generate,
-        admin::agent::writing::stream,
+        admin::agent::writing::stream, admin::agent::writing::capabilities,
+        admin::agent::tools::list, admin::agent::tools::update, admin::agent::tools::test,
+        admin::agent::skills::list, admin::agent::skills::get, admin::agent::skills::install,
+        admin::agent::skills::install_github, admin::agent::skills::file, admin::agent::skills::export,
+        admin::agent::skills::update, admin::agent::skills::set_enabled, admin::agent::skills::delete,
         client::link_preview::preview, admin::notion::pages, admin::notion::sync),
     components(schemas(ApiError, ArticleSummaryResponse, ArticlePageResponse, ArticleDetailResponse, HealthResponse,
         admin::auth::LoginRequest, admin::auth::SessionResponse, admin::auth::OkResponse,
@@ -162,7 +170,15 @@ pub struct HealthResponse {
         admin::agent::ProviderInput, admin::agent::ProviderResponse, admin::agent::BindingInput,
         admin::agent::BindingResponse, admin::agent::summary::SummaryInput,
         admin::agent::summary::SummaryResponse, admin::agent::writing::WritingInput,
-        admin::agent::writing::WritingResponse, crate::agent::writing::WritingAction,
+        admin::agent::writing::WritingResponse, admin::agent::writing::WritingCapabilities,
+        crate::agent::writing_image::WritingImage, crate::agent::writing::WritingAction,
+        crate::domain::agent_skill::SkillSummary, crate::infrastructure::agent_skills::SkillDetail,
+        crate::infrastructure::agent_skills::SkillCatalog, crate::infrastructure::agent_skills::SkillFile,
+        admin::agent::skills::SkillDocumentInput, admin::agent::skills::GithubInstallInput, admin::agent::skills::SkillEnabledInput,
+        crate::agent::tools::ToolDescriptor, crate::domain::agent_tool::WebSearchSettings,
+        crate::domain::agent_tool::SearchEngine, crate::domain::agent_tool::SearchRecency,
+        crate::domain::agent_tool::SearchContentSize, crate::infrastructure::web_search::SearchInput,
+        crate::infrastructure::web_search::SearchResponse, crate::infrastructure::web_search::SearchHit,
         client::link_preview::LinkPreview,
         admin::notion::NotionPageItem, admin::notion::NotionPageList,
         admin::notion::SyncInput, admin::notion::SyncResponse)),
@@ -280,17 +296,64 @@ pub fn router(state: AppState) -> Router {
             axum::routing::put(admin::agent::update_provider).delete(admin::agent::delete_provider),
         )
         .route("/api/v1/admin/agent/bindings", get(admin::agent::bindings))
+        .route("/api/v1/admin/agent/tools", get(admin::agent::tools::list))
+        .route(
+            "/api/v1/admin/agent/tools/webSearch",
+            axum::routing::put(admin::agent::tools::update),
+        )
+        .route(
+            "/api/v1/admin/agent/tools/webSearch/test",
+            post(admin::agent::tools::test),
+        )
+        .route(
+            "/api/v1/admin/agent/skills",
+            get(admin::agent::skills::list),
+        )
+        .route(
+            "/api/v1/admin/agent/skills/{name}",
+            get(admin::agent::skills::get)
+                .put(admin::agent::skills::update)
+                .delete(admin::agent::skills::delete),
+        )
+        .route(
+            "/api/v1/admin/agent/skills/{name}/enabled",
+            axum::routing::patch(admin::agent::skills::set_enabled),
+        )
+        .route(
+            "/api/v1/admin/agent/skills/install",
+            post(admin::agent::skills::install).layer(axum::extract::DefaultBodyLimit::max(
+                crate::infrastructure::agent_skills::MAX_PACKAGE_BYTES + 1024 * 1024,
+            )),
+        )
+        .route(
+            "/api/v1/admin/agent/skills/install/github",
+            post(admin::agent::skills::install_github),
+        )
+        .route(
+            "/api/v1/admin/agent/skills/{name}/files",
+            get(admin::agent::skills::file),
+        )
+        .route(
+            "/api/v1/admin/agent/skills/{name}/export",
+            get(admin::agent::skills::export),
+        )
         .route(
             "/api/v1/admin/agent/summary",
             post(admin::agent::summary::generate),
         )
         .route(
             "/api/v1/admin/agent/writing",
-            post(admin::agent::writing::generate),
+            post(admin::agent::writing::generate)
+                .layer(axum::extract::DefaultBodyLimit::max(10 * 1024 * 1024)),
         )
         .route(
             "/api/v1/admin/agent/writing/stream",
-            post(admin::agent::writing::stream),
+            post(admin::agent::writing::stream)
+                .layer(axum::extract::DefaultBodyLimit::max(10 * 1024 * 1024)),
+        )
+        .route(
+            "/api/v1/admin/agent/writing/capabilities",
+            get(admin::agent::writing::capabilities),
         )
         .route(
             "/api/v1/admin/agent/bindings/{task}",
@@ -401,6 +464,16 @@ mod tests {
     /// 使用无连接的探针依赖，公开文章路由由假仓储提供。
     fn app() -> Router {
         router(AppState {
+            tools: Arc::new(
+                crate::agent::tools::ToolRegistry::new(
+                    std::env::temp_dir().join("oxide-test-tools.json"),
+                    None,
+                )
+                .unwrap(),
+            ),
+            skills: Arc::new(crate::infrastructure::agent_skills::SkillStore::new(
+                std::env::temp_dir().join("oxide-test-skills"),
+            )),
             articles: Arc::new(FakeArticles),
             db: DatabaseConnection::default(),
             redis: redis::Client::open("redis://127.0.0.1/").unwrap(),
@@ -460,6 +533,15 @@ mod tests {
         assert!(doc["paths"]["/api/v1/admin/agent/summary"].is_object());
         assert!(doc["paths"]["/api/v1/admin/agent/writing"].is_object());
         assert!(doc["paths"]["/api/v1/admin/agent/writing/stream"].is_object());
+        assert!(doc["paths"]["/api/v1/admin/agent/writing/capabilities"].is_object());
+        assert!(doc["paths"]["/api/v1/admin/agent/skills"].is_object());
+        assert!(doc["paths"]["/api/v1/admin/agent/tools"].is_object());
+        assert!(doc["paths"]["/api/v1/admin/agent/tools/webSearch"].is_object());
+        assert!(doc["paths"]["/api/v1/admin/agent/tools/webSearch/test"].is_object());
+        assert!(doc["paths"]["/api/v1/admin/agent/skills/{name}"].is_object());
+        assert!(doc["paths"]["/api/v1/admin/agent/skills/{name}/enabled"].is_object());
+        assert!(doc["paths"]["/api/v1/admin/agent/skills/install"].is_object());
+        assert!(doc["paths"]["/api/v1/admin/agent/skills/install/github"].is_object());
         let (status, body) = get("/health/live").await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(body["status"], "ok");

@@ -7,7 +7,7 @@ import { ArrowLeft, History, Save, Trash2, PanelRight, Sparkles } from "lucide-r
 import { csrfHeaders, useAdminSession } from "../../admin/AdminSession";
 import { ArticlePresentation } from "../../article/components/ArticlePresentation";
 import { apiRequest } from "../../../lib/api/client";
-import type { AdminArticle, Taxonomy } from "../../../lib/api/types";
+import type { AdminArticle } from "../../../lib/api/types";
 import { sourceFromDocument, type MarkdownDocument } from "../markdownDocument";
 import { EditorToolbar, type MarkdownCommand } from "./EditorToolbar";
 import { PublishPanel, type CoverSelection } from "./PublishPanel";
@@ -17,6 +17,15 @@ import { useWritingAssistant } from "../hooks/useWritingAssistant";
 import { WritingAssistant, WritingSelectionActions } from "./WritingAssistant";
 import { ResizeHandle } from "./ResizeHandle";
 import { ThemeControl } from "../../../components/layout/ThemeControl";
+import {
+  editorDraftKey,
+  readEditorDraft,
+  storeEditorDraft,
+  type EditorDraftValues,
+} from "../editorDraft";
+import { useEditorDraftProtection } from "../hooks/useEditorDraftProtection";
+import { useEditorLayout } from "../hooks/useEditorLayout";
+import { useArticleTaxonomies } from "../hooks/useArticleTaxonomies";
 
 const editorExtensions = [
   markdown(),
@@ -44,9 +53,8 @@ export function ArticleEditor({ publicId }: { publicId?: string }) {
   const navigate = useNavigate();
   const editorView = useRef<EditorView | null>(null);
   const writing = useWritingAssistant(editorView);
-  const workspace = useRef<HTMLDivElement>(null);
-  const [previewVisible, setPreviewVisible] = useState(true);
-  const [split, setSplit] = useState(50);
+  const { workspace, previewVisible, split, view, setPreviewVisible, setView, rememberLayout } =
+    useEditorLayout();
   const imageInput = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
@@ -54,15 +62,19 @@ export function ArticleEditor({ publicId }: { publicId?: string }) {
   const [source, setSource] = useState("");
   const [status, setStatus] = useState<"draft" | "published">("draft");
   const [publishedAt, setPublishedAt] = useState<string | null>(null);
-  const [view, setView] = useState<"edit" | "preview">("edit");
   const [publishOpen, setPublishOpen] = useState(false);
   const [cover, setCover] = useState<CoverSelection>({ asset_public_id: null, media_url: null });
   const savedId = useRef(publicId);
   const draftSlug = useRef("");
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState(false);
-  const [categories, setCategories] = useState<Taxonomy[]>([]);
-  const [tags, setTags] = useState<Taxonomy[]>([]);
+  const [ready, setReady] = useState(false);
+  const [autosavePaused, setAutosavePaused] = useState(false);
+  const [autosaveMessage, setAutosaveMessage] = useState("");
+  const serverUpdatedAt = useRef<string | null>(null);
+  const lastSaved = useRef("");
+  const operation = useRef<Promise<AdminArticle> | null>(null);
+  const { categories, tags, error: taxonomyError } = useArticleTaxonomies();
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [revisions, setRevisions] = useState<
@@ -70,77 +82,136 @@ export function ArticleEditor({ publicId }: { publicId?: string }) {
   >([]);
   const { html: previewHtml, error: previewError } = useArticlePreview(source, session);
   const lines = source ? source.split("\n").length : 1;
+  const values: EditorDraftValues = {
+    title,
+    slug,
+    summary,
+    source,
+    cover,
+    categories: selectedCategories,
+    tags: selectedTags,
+  };
+  const latestValues = useRef(values);
+  latestValues.current = values;
+  const fingerprint = JSON.stringify(values);
+  const storageKey = session ? editorDraftKey(session.username, publicId) : null;
+  const dirty = ready && fingerprint !== lastSaved.current;
+  const protection = useEditorDraftProtection({
+    storageKey,
+    ready,
+    dirty,
+    draft: {
+      version: 1,
+      values,
+      savedId: savedId.current,
+      serverUpdatedAt: serverUpdatedAt.current,
+      savedAt: new Date().toISOString(),
+    },
+  });
 
   useEffect(() => {
-    try {
-      const preference = JSON.parse(localStorage.getItem("oxide.editor.layout") ?? "null") as {
-        preview?: boolean;
-        split?: number;
-      } | null;
-      if (typeof preference?.preview === "boolean") setPreviewVisible(preference.preview);
-      if (typeof preference?.split === "number" && Number.isFinite(preference.split))
-        setSplit(Math.max(20, Math.min(80, preference.split)));
-    } catch {
-      /* 无效或禁用的本地存储不影响编辑。 */
+    if (!session?.username) return;
+    const active = new AbortController();
+    const key = editorDraftKey(session.username, publicId);
+    setReady(false);
+    setAutosavePaused(false);
+    setAutosaveMessage("");
+    function applyValues(value: EditorDraftValues) {
+      setTitle(value.title);
+      setSlug(value.slug);
+      setSummary(value.summary);
+      setSource(value.source);
+      setCover(value.cover);
+      setSelectedCategories(value.categories);
+      setSelectedTags(value.tags);
     }
-  }, []);
-
-  /** 只保存布局偏好，不将文章正文或对话写入浏览器存储。 */
-  function rememberLayout(preview: boolean, width: number) {
-    setPreviewVisible(preview);
-    setSplit(width);
-    try {
-      localStorage.setItem("oxide.editor.layout", JSON.stringify({ preview, split: width }));
-    } catch {
-      /* 隐私模式下保持本次会话的布局即可。 */
-    }
-  }
-
-  useEffect(() => {
-    Promise.all([
-      apiRequest<Taxonomy[]>("/api/v1/categories"),
-      apiRequest<Taxonomy[]>("/api/v1/tags"),
-    ])
-      .then(([categoryItems, tagItems]) => {
-        setCategories(categoryItems);
-        setTags(tagItems);
-      })
-      .catch((error) => setMessage(error.message));
-  }, []);
-
-  useEffect(() => {
-    if (!publicId) return;
-    savedId.current = publicId;
-    apiRequest<CoverSelection>(`/api/v1/admin/articles/${publicId}/cover`)
-      .then(setCover)
-      .catch((error) => setMessage(error.message));
-    apiRequest<AdminArticle>(`/api/v1/admin/articles/${publicId}`)
-      .then((article) => {
-        setTitle(article.title);
-        setSlug(article.slug);
-        setSummary(article.summary ?? "");
-        setStatus(article.status);
-        setPublishedAt(article.published_at);
-        setSource(sourceFromDocument(article.document));
-        if (article.document.type !== "markdown") {
-          setMessage("旧文章已转换为 Markdown；保存后采用新格式");
+    async function load() {
+      let cached: ReturnType<typeof readEditorDraft> = null;
+      try {
+        cached = readEditorDraft(key);
+      } catch (cause) {
+        setMessage(cause instanceof Error ? cause.message : "本地草稿读取失败");
+        setAutosavePaused(true);
+      }
+      const id = publicId ?? cached?.savedId;
+      savedId.current = id;
+      try {
+        const empty: EditorDraftValues = {
+          title: "",
+          slug: "",
+          summary: "",
+          source: "",
+          cover: { asset_public_id: null, media_url: null },
+          categories: [],
+          tags: [],
+        };
+        if (!id) {
+          lastSaved.current = JSON.stringify(empty);
+          serverUpdatedAt.current = null;
+          applyValues(cached?.values ?? empty);
+          setStatus("draft");
+          setPublishedAt(null);
+          setRevisions([]);
+          if (cached) setAutosaveMessage("已恢复本地草稿");
+        } else {
+          const [article, currentCover, taxonomy, history] = await Promise.all([
+            apiRequest<AdminArticle>("/api/v1/admin/articles/" + id, { signal: active.signal }),
+            apiRequest<CoverSelection>("/api/v1/admin/articles/" + id + "/cover", {
+              signal: active.signal,
+            }),
+            apiRequest<{ categories: string[]; tags: string[] }>(
+              "/api/v1/admin/articles/" + id + "/taxonomy",
+              { signal: active.signal },
+            ),
+            apiRequest<{ saved_at: string; document: Record<string, unknown> }[]>(
+              "/api/v1/admin/articles/" + id + "/revisions",
+              { signal: active.signal },
+            ),
+          ]);
+          if (active.signal.aborted) return;
+          const stored: EditorDraftValues = {
+            title: article.title,
+            slug: article.slug,
+            summary: article.summary ?? "",
+            source: sourceFromDocument(article.document),
+            cover: currentCover,
+            categories: taxonomy.categories,
+            tags: taxonomy.tags,
+          };
+          lastSaved.current = JSON.stringify(stored);
+          serverUpdatedAt.current = article.updated_at;
+          setStatus(article.status);
+          setPublishedAt(article.published_at);
+          setRevisions(history);
+          applyValues(cached?.values ?? stored);
+          if (cached && JSON.stringify(cached.values) !== JSON.stringify(stored)) {
+            const conflict =
+              !!cached.serverUpdatedAt && cached.serverUpdatedAt !== article.updated_at;
+            setAutosavePaused(conflict);
+            setAutosaveMessage(
+              conflict
+                ? "已恢复本地草稿；服务器另有更新，自动保存已暂停，请核对后手动保存"
+                : "已恢复尚未提交的本地草稿",
+            );
+          } else if (article.document.type !== "markdown")
+            setMessage("旧文章已转换为 Markdown；保存后采用新格式");
         }
-      })
-      .catch((error) => setMessage(error.message));
-    apiRequest<{ categories: string[]; tags: string[] }>(
-      `/api/v1/admin/articles/${publicId}/taxonomy`,
-    )
-      .then((data) => {
-        setSelectedCategories(data.categories);
-        setSelectedTags(data.tags);
-      })
-      .catch((error) => setMessage(error.message));
-    apiRequest<{ saved_at: string; document: Record<string, unknown> }[]>(
-      `/api/v1/admin/articles/${publicId}/revisions`,
-    )
-      .then(setRevisions)
-      .catch((error) => setMessage(error.message));
-  }, [publicId]);
+        if (!active.signal.aborted) setReady(true);
+      } catch (cause) {
+        if (active.signal.aborted) return;
+        if (cached) {
+          applyValues(cached.values);
+          lastSaved.current = "";
+          serverUpdatedAt.current = cached.serverUpdatedAt;
+          setReady(true);
+        }
+        setAutosavePaused(true);
+        setMessage(cause instanceof Error ? cause.message : "加载文章失败");
+      }
+    }
+    void load();
+    return () => active.abort();
+  }, [publicId, session?.username]);
 
   /** 在当前选区插入 Markdown 语法，保留光标位置供连续写作。 */
   function insert(before: string, after = "", placeholder = "文字") {
@@ -193,36 +264,121 @@ export function ArticleEditor({ publicId }: { publicId?: string }) {
     }
   }
 
-  /** 保存 Markdown 原文；服务端负责生成正式公开 HTML。 */
-  async function persistArticle(): Promise<AdminArticle> {
+  /** 保存操作串行化；自动写入仅允许草稿，并带版本号避免覆盖其他标签页。 */
+  async function persistArticle(automatic = false): Promise<AdminArticle> {
     if (!session) throw new Error("请先登录");
-    const document: MarkdownDocument = { type: "markdown", source };
-    const articleSlug = ensureSlug();
-    const article = await apiRequest<AdminArticle>(
-      savedId.current ? `/api/v1/admin/articles/${savedId.current}` : "/api/v1/admin/articles",
-      {
-        method: savedId.current ? "PUT" : "POST",
-        headers: csrfHeaders(session),
-        body: JSON.stringify({
-          title: title.trim() || "未命名文章",
-          slug: articleSlug,
-          summary: summary || null,
-          document,
-        }),
-      },
-    );
-    savedId.current = article.public_id;
-    await apiRequest(`/api/v1/admin/articles/${article.public_id}/cover`, {
-      method: "PUT",
-      headers: csrfHeaders(session),
-      body: JSON.stringify({ asset_public_id: cover.asset_public_id }),
-    });
-    await apiRequest(`/api/v1/admin/articles/${article.public_id}/taxonomy`, {
-      method: "PUT",
-      headers: csrfHeaders(session),
-      body: JSON.stringify({ categories: selectedCategories, tags: selectedTags }),
-    });
-    return article;
+    if (operation.current) await operation.current;
+    const captured = { ...latestValues.current };
+    const previous = lastSaved.current
+      ? (JSON.parse(lastSaved.current) as EditorDraftValues)
+      : null;
+    if (!captured.slug) {
+      draftSlug.current ||= "article-" + crypto.randomUUID().slice(0, 12);
+      captured.slug = draftSlug.current;
+      setSlug(captured.slug);
+    }
+    const write = async () => {
+      const article = await apiRequest<AdminArticle>(
+        savedId.current ? "/api/v1/admin/articles/" + savedId.current : "/api/v1/admin/articles",
+        {
+          method: savedId.current ? "PUT" : "POST",
+          headers: csrfHeaders(session),
+          body: JSON.stringify({
+            title: captured.title.trim() || "未命名文章",
+            slug: captured.slug,
+            summary: captured.summary || null,
+            document: { type: "markdown", source: captured.source } satisfies MarkdownDocument,
+            draft_only: automatic,
+            expected_updated_at: serverUpdatedAt.current,
+          }),
+        },
+      );
+      savedId.current = article.public_id;
+      serverUpdatedAt.current = article.updated_at;
+      const coverChanged =
+        !previous || previous.cover.asset_public_id !== captured.cover.asset_public_id;
+      const taxonomyChanged =
+        !previous ||
+        JSON.stringify([previous.categories, previous.tags]) !==
+          JSON.stringify([captured.categories, captured.tags]);
+      if (coverChanged)
+        await apiRequest("/api/v1/admin/articles/" + article.public_id + "/cover", {
+          method: "PUT",
+          headers: csrfHeaders(session),
+          body: JSON.stringify({ asset_public_id: captured.cover.asset_public_id }),
+        });
+      if (taxonomyChanged)
+        await apiRequest("/api/v1/admin/articles/" + article.public_id + "/taxonomy", {
+          method: "PUT",
+          headers: csrfHeaders(session),
+          body: JSON.stringify({ categories: captured.categories, tags: captured.tags }),
+        });
+      const completed = coverChanged
+        ? await apiRequest<AdminArticle>("/api/v1/admin/articles/" + article.public_id)
+        : article;
+      serverUpdatedAt.current = completed.updated_at;
+      if (
+        sourceFromDocument(completed.document) !== captured.source ||
+        completed.slug !== captured.slug ||
+        completed.title !== (captured.title.trim() || "未命名文章")
+      )
+        throw new Error("保存期间文章被其他窗口更新，请刷新后核对本地草稿");
+      lastSaved.current = JSON.stringify(captured);
+      setAutosavePaused(false);
+      setAutosaveMessage(automatic ? "草稿已自动保存到服务器" : "已保存到服务器");
+      return completed;
+    };
+    const running = write();
+    operation.current = running;
+    try {
+      return await running;
+    } finally {
+      if (operation.current === running) operation.current = null;
+    }
+  }
+
+  const persistRef = useRef(persistArticle);
+  persistRef.current = persistArticle;
+  useEffect(() => {
+    if (
+      !ready ||
+      !dirty ||
+      pending ||
+      autosavePaused ||
+      status !== "draft" ||
+      (!title.trim() && !source.trim())
+    )
+      return;
+    const timer = window.setTimeout(() => {
+      setPending(true);
+      setAutosaveMessage("正在自动保存草稿…");
+      void persistRef
+        .current(true)
+        .catch((cause: unknown) => {
+          setAutosavePaused(true);
+          setAutosaveMessage(
+            "自动保存暂停：" +
+              (cause instanceof Error ? cause.message : "网络异常") +
+              "。本地草稿仍保留，可点击保存重试。",
+          );
+        })
+        .finally(() => setPending(false));
+    }, 1500);
+    return () => window.clearTimeout(timer);
+  }, [ready, dirty, fingerprint, pending, autosavePaused, status, title, source]);
+
+  /** 手动保存新文章前把尚未完成的编辑转移到目标恢复槽位。 */
+  function transferDraft(id: string) {
+    if (!session || publicId) return;
+    if (JSON.stringify(latestValues.current) !== lastSaved.current)
+      storeEditorDraft(editorDraftKey(session.username, id), {
+        version: 1,
+        values: latestValues.current,
+        savedId: id,
+        serverUpdatedAt: serverUpdatedAt.current,
+        savedAt: new Date().toISOString(),
+      });
+    protection.discard();
   }
 
   async function save() {
@@ -232,6 +388,7 @@ export function ArticleEditor({ publicId }: { publicId?: string }) {
       const article = await persistArticle();
       setMessage("已保存");
       if (!publicId) {
+        transferDraft(article.public_id);
         await navigate({
           to: "/admin/articles/$publicId",
           params: { publicId: article.public_id },
@@ -257,9 +414,11 @@ export function ArticleEditor({ publicId }: { publicId?: string }) {
       );
       setStatus(article.status);
       setPublishedAt(article.published_at);
+      serverUpdatedAt.current = article.updated_at;
       setPublishOpen(false);
       setMessage(article.status === "published" ? "文章已发布" : "文章已撤回");
       if (!publicId) {
+        transferDraft(article.public_id);
         await navigate({
           to: "/admin/articles/$publicId",
           params: { publicId: article.public_id },
@@ -279,6 +438,7 @@ export function ArticleEditor({ publicId }: { publicId?: string }) {
         method: "DELETE",
         headers: csrfHeaders(session),
       });
+      protection.discard();
       await navigate({ to: "/admin" });
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "删除失败");
@@ -299,6 +459,7 @@ export function ArticleEditor({ publicId }: { publicId?: string }) {
       );
       setStatus(article.status);
       setMessage("文章已撤回草稿");
+      serverUpdatedAt.current = article.updated_at;
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "撤回失败");
     } finally {
@@ -355,6 +516,16 @@ export function ArticleEditor({ publicId }: { publicId?: string }) {
         }
       }}
     >
+      {!ready && (
+        <p role="status" className="editor-draft-notice">
+          正在加载文章与恢复草稿…
+        </p>
+      )}
+      {(protection.error || autosavePaused) && (
+        <p role="alert" className="editor-draft-notice">
+          {protection.error || autosaveMessage || "自动保存已暂停，请核对后手动保存"}
+        </p>
+      )}
       <header className="markdown-commandbar">
         <Link to="/admin" title="返回文章列表" aria-label="返回文章列表" className="markdown-back">
           <ArrowLeft size={19} />
@@ -365,10 +536,21 @@ export function ArticleEditor({ publicId }: { publicId?: string }) {
           placeholder="输入文章标题..."
           value={title}
           maxLength={160}
+          disabled={!ready}
           onChange={(event) => setTitle(event.target.value)}
         />
         <span className="markdown-save-status" role="status">
-          {message}
+          {message ||
+            taxonomyError ||
+            (pending
+              ? autosaveMessage
+              : dirty
+                ? protection.protected
+                  ? status === "published"
+                    ? "已保护本地草稿 · 发布正文需手动保存"
+                    : "本地草稿已保护，等待自动保存"
+                  : "正在保护草稿…"
+                : autosaveMessage)}
         </span>
         <ThemeControl compact />
         {publicId && (
@@ -401,7 +583,12 @@ export function ArticleEditor({ publicId }: { publicId?: string }) {
             </div>
           </details>
         )}
-        <button type="button" onClick={save} disabled={pending} className="button-secondary">
+        <button
+          type="button"
+          onClick={save}
+          disabled={pending || !ready}
+          className="button-secondary"
+        >
           <Save size={16} /> {status === "published" ? "保存修改" : "保存草稿"}
         </button>
         <button
@@ -411,113 +598,121 @@ export function ArticleEditor({ publicId }: { publicId?: string }) {
             setMessage("");
             setPublishOpen(true);
           }}
-          disabled={pending}
+          disabled={pending || !ready}
           className="button-primary"
         >
           {status === "draft" ? "发布" : "发布设置"}
         </button>
       </header>
-      <div className="markdown-tool-row">
-        <EditorToolbar onCommand={format} />
-        <div className="markdown-view-controls">
-          <button
-            type="button"
-            aria-pressed={previewVisible}
-            onClick={() => {
-              rememberLayout(!previewVisible, split);
-              setView("edit");
-            }}
-            title={previewVisible ? "隐藏预览" : "显示预览"}
-          >
-            <PanelRight size={16} />
-            {previewVisible ? "隐藏预览" : "显示预览"}
-          </button>
-          <button
-            type="button"
-            aria-pressed={writing.panelOpen}
-            onClick={() => writing.setPanelOpen(!writing.panelOpen)}
-          >
-            <Sparkles size={16} />
-            AI 对话
-          </button>
-        </div>
-      </div>
-      <input
-        ref={imageInput}
-        type="file"
-        accept="image/png,image/jpeg,image/gif,image/webp"
-        className="hidden"
-        onChange={(event) => {
-          const file = event.target.files?.[0];
-          if (file) void uploadImage(file);
-          event.target.value = "";
-        }}
-      />
-      <div className="editor-view-switch" aria-label="编辑视图">
-        <button type="button" aria-pressed={view === "edit"} onClick={() => setView("edit")}>
-          源码
-        </button>
-        <button
-          type="button"
-          aria-pressed={view === "preview"}
-          onClick={() => {
-            setPreviewVisible(true);
-            setView("preview");
-          }}
-        >
-          预览
-        </button>
-      </div>
       <div className="editor-writing-layout">
-        <div
-          className="editor-workspace"
-          ref={workspace}
-          data-preview={previewVisible}
-          style={{ "--editor-split": split + "%" } as CSSProperties}
-        >
-          <div className="editor-pane editor-edit-pane markdown-source">
-            <WritingSelectionActions assistant={writing} />
-            <CodeMirror
-              value={source}
-              height="100%"
-              extensions={[...editorExtensions, ...writing.extensions]}
-              basicSetup={{
-                lineNumbers: false,
-                foldGutter: false,
-                highlightActiveLine: false,
-                highlightActiveLineGutter: false,
-              }}
-              onCreateEditor={(view) => {
-                editorView.current = view;
-              }}
-              onChange={setSource}
-              aria-label="Markdown 正文"
-              placeholder="从这里开始写作..."
-            />
+        <div className="editor-writing-main">
+          <div className="markdown-tool-row" data-preview={previewVisible}>
+            <div className="markdown-tool-content">
+              <EditorToolbar onCommand={format} />
+              <div className="markdown-view-controls">
+                <button
+                  type="button"
+                  aria-pressed={previewVisible}
+                  onClick={() => {
+                    rememberLayout(!previewVisible, split);
+                    setView("edit");
+                  }}
+                  title={previewVisible ? "隐藏预览" : "显示预览"}
+                >
+                  <PanelRight size={16} />
+                  {previewVisible ? "隐藏预览" : "显示预览"}
+                </button>
+                <button
+                  type="button"
+                  data-writing-panel-trigger
+                  aria-pressed={writing.panelOpen}
+                  onClick={() => writing.setPanelOpen(!writing.panelOpen)}
+                >
+                  <Sparkles size={16} />
+                  AI 对话
+                </button>
+              </div>
+            </div>
           </div>
-          {previewVisible && (
-            <>
-              <ResizeHandle
-                label="调整源码和预览宽度"
-                value={split}
-                onChange={(width) => rememberLayout(previewVisible, width)}
-                container={workspace}
-              />
-              <aside className="editor-pane editor-preview-pane" aria-label="实时预览">
-                <div className="editor-preview-content">
-                  <div>
-                    <ArticlePresentation
-                      title={title}
-                      summary={summary || null}
-                      publishedAt={publishedAt}
-                      html={previewHtml}
-                      coverUrl={cover.media_url}
-                    />
+          <input
+            ref={imageInput}
+            type="file"
+            accept="image/png,image/jpeg,image/gif,image/webp"
+            className="hidden"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) void uploadImage(file);
+              event.target.value = "";
+            }}
+          />
+          <div className="editor-view-switch" aria-label="编辑视图">
+            <button type="button" aria-pressed={view === "edit"} onClick={() => setView("edit")}>
+              源码
+            </button>
+            <button
+              type="button"
+              aria-pressed={view === "preview"}
+              onClick={() => {
+                setPreviewVisible(true);
+                setView("preview");
+              }}
+            >
+              预览
+            </button>
+          </div>
+          <div
+            className="editor-workspace"
+            ref={workspace}
+            data-preview={previewVisible}
+            style={{ "--editor-split": split + "%" } as CSSProperties}
+          >
+            <div className="editor-pane editor-edit-pane markdown-source">
+              <WritingSelectionActions assistant={writing} />
+              {ready && (
+                <CodeMirror
+                  editable={ready}
+                  value={source}
+                  height="100%"
+                  extensions={[...editorExtensions, ...writing.extensions]}
+                  basicSetup={{
+                    lineNumbers: false,
+                    foldGutter: false,
+                    highlightActiveLine: false,
+                    highlightActiveLineGutter: false,
+                  }}
+                  onCreateEditor={(view) => {
+                    editorView.current = view;
+                  }}
+                  onChange={setSource}
+                  aria-label="Markdown 正文"
+                  placeholder="从这里开始写作..."
+                />
+              )}
+            </div>
+            {previewVisible && (
+              <>
+                <ResizeHandle
+                  label="调整源码和预览宽度"
+                  value={split}
+                  onChange={(width) => rememberLayout(previewVisible, width)}
+                  container={workspace}
+                />
+                <aside className="editor-pane editor-preview-pane" aria-label="实时预览">
+                  <div className="editor-preview-content">
+                    <div>
+                      <ArticlePresentation
+                        title={title}
+                        summary={summary || null}
+                        publishedAt={publishedAt}
+                        html={previewHtml}
+                        coverUrl={cover.media_url}
+                      />
+                    </div>
                   </div>
-                </div>
-              </aside>
-            </>
-          )}
+                </aside>
+              </>
+            )}
+          </div>
         </div>
         <WritingAssistant assistant={writing} />
       </div>
@@ -539,7 +734,7 @@ export function ArticleEditor({ publicId }: { publicId?: string }) {
           selectedCategories={selectedCategories}
           selectedTags={selectedTags}
           pending={pending}
-          message={message}
+          message={message || taxonomyError}
           published={status === "published"}
           onSlug={setSlug}
           onSummary={setSummary}

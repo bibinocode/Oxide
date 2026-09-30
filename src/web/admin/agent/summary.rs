@@ -55,6 +55,7 @@ pub async fn generate(
             );
         }
     };
+    // 多模态摘要
     let provider = match agent_runtime::text_provider(&state.db, AgentTask::Summary).await {
         Ok(Some(provider)) => provider,
         Ok(None) => {
@@ -73,10 +74,15 @@ pub async fn generate(
             );
         }
     };
+    let system =
+        match super::task_context(&state, AgentTask::Summary, summary::SYSTEM_PROMPT, "").await {
+            Ok(system) => system,
+            Err(response) => return response,
+        };
     let generated = agent_runtime::generate_text(
         &provider,
         &state.comment_hash_key,
-        summary::SYSTEM_PROMPT,
+        &system,
         prompt,
         summary::GENERATION_OPTIONS,
     )

@@ -32,9 +32,16 @@ export function ProviderSection() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    apiRequest<Provider[]>("/api/v1/admin/storage-providers")
-      .then(setProviders)
-      .catch((error) => setMessage(error.message));
+    const controller = new AbortController();
+    apiRequest<Provider[]>("/api/v1/admin/storage-providers", { signal: controller.signal })
+      .then((items) => {
+        if (!controller.signal.aborted) setProviders(items);
+      })
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted)
+          setMessage(error instanceof Error ? error.message : "存储配置加载失败");
+      });
+    return () => controller.abort();
   }, []);
 
   function editProvider(provider: Provider) {

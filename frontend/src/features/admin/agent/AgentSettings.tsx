@@ -48,15 +48,21 @@ export function AgentSettings() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
+    const controller = new AbortController();
     Promise.all([
-      apiRequest<AgentProvider[]>("/api/v1/admin/agent/providers"),
-      apiRequest<Binding[]>("/api/v1/admin/agent/bindings"),
+      apiRequest<AgentProvider[]>("/api/v1/admin/agent/providers", { signal: controller.signal }),
+      apiRequest<Binding[]>("/api/v1/admin/agent/bindings", { signal: controller.signal }),
     ])
       .then(([models, routes]) => {
+        if (controller.signal.aborted) return;
         setProviders(models);
         setBindings(routes);
       })
-      .catch((error) => setMessage(error.message));
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted)
+          setMessage(error instanceof Error ? error.message : "Agent 配置加载失败");
+      });
+    return () => controller.abort();
   }, []);
 
   function edit(provider: AgentProvider) {

@@ -8,6 +8,16 @@ export interface WritingProgress {
   kind: "reasoning" | "tool" | "status";
   content: string;
   delta?: boolean;
+  sources?: WritingSource[];
+}
+
+/** 搜索服务真实返回的来源索引，与回答正文独立呈现。 */
+export interface WritingSource {
+  reference: string;
+  title: string;
+  url: string;
+  source: string;
+  publish_date: string | null;
 }
 
 /** POST SSE 使用标准 fetch，以便发送 CSRF 头并支持 AbortController。 */
@@ -47,6 +57,7 @@ export async function readWritingStream(
             message?: string;
             id?: string;
             delta?: boolean;
+            sources?: WritingSource[];
           };
           if (event === "delta") onDelta(payload.content ?? "");
           if (event === "error") throw new Error(payload.message ?? "写作生成失败");
@@ -57,6 +68,7 @@ export async function readWritingStream(
               kind: event,
               content: payload.content ?? payload.message ?? "",
               delta: payload.delta,
+              sources: payload.sources,
             });
           }
         }

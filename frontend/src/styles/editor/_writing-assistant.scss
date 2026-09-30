@@ -1,4 +1,16 @@
 /* 原位输入、对话面板与修改审阅使用同一组主题变量，支持深色模式。 */
+.markdown-editor {
+  --writing-control-line: #e4e7eb;
+  --writing-control-focus: #a1aab3;
+  --writing-control-active: #49525d;
+  --writing-control-selected: #f1f3f5;
+}
+:root[data-theme="dark"] .markdown-editor {
+  --writing-control-line: var(--page-line);
+  --writing-control-focus: var(--page-subtle);
+  --writing-control-active: var(--page-accent);
+  --writing-control-selected: var(--page-paper);
+}
 .markdown-source {
   position: relative;
 }
@@ -27,17 +39,23 @@
   background: var(--color-paper);
 }
 .writing-inline-prompt {
-  display: flex;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
-  min-height: 52px;
+  min-width: 0;
   margin: 8px 0 12px;
-  border: 1px solid var(--page-line);
+  border: 1px solid var(--writing-control-line);
   border-radius: 16px;
   background: var(--page-bg);
-  padding: 8px 12px;
-  box-shadow: 0 3px 12px rgb(0 0 0 / 4%);
-  font-family: var(--font-sans);
+  padding: 9px 10px;
+  box-shadow:
+    0 2px 4px rgb(0 0 0 / 2%),
+    0 8px 24px rgb(0 0 0 / 3%);
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+  font-family: var(--font-sans, "Geist", "Noto Sans SC", system-ui, sans-serif);
 }
 .writing-ai-badge {
   display: inline-flex;
@@ -51,40 +69,48 @@
   color: var(--page-text);
   background: var(--page-bg);
 }
+.writing-ai-avatar {
+  display: block;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  object-fit: contain;
+  mix-blend-mode: multiply;
+}
+:root[data-theme="dark"] .writing-ai-avatar {
+  filter: invert(1);
+  mix-blend-mode: screen;
+}
 .writing-prompt-status {
-  flex: 1;
+  margin-right: auto;
   color: var(--page-subtle);
   font-size: 13px;
 }
 .writing-generating-prompt .writing-ai-badge {
   border-color: transparent;
-  animation: writing-pulse 1.5s ease-in-out infinite;
 }
 .writing-inline-prompt textarea {
-  flex: 1;
+  display: block;
+  width: 100%;
   min-width: 0;
-  max-height: 140px;
+  min-height: 24px;
+  max-height: 180px;
+  padding: 0;
   resize: none;
   border: 0;
   outline: 0;
   background: transparent;
   color: var(--page-text);
-  font: 13px/1.7 var(--font-sans);
-  field-sizing: content;
+  font: 13px/24px var(--font-sans, "Geist", "Noto Sans SC", system-ui, sans-serif);
 }
 .writing-inline-prompt textarea::placeholder {
   color: var(--page-subtle);
   opacity: 0.65;
 }
-.writing-inline-prompt button {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  color: var(--page-subtle);
-}
-.writing-inline-prompt button:hover {
-  background: var(--color-paper);
-  color: var(--page-text);
+.writing-generating-prompt {
+  display: flex;
+  align-items: center;
+  min-height: 52px;
 }
 .writing-chat {
   position: relative;
@@ -97,7 +123,7 @@
   border-left: 1px solid var(--page-line);
   background: var(--page-bg);
   color: var(--page-text);
-  font-family: var(--font-sans);
+  font-family: var(--font-sans, "Geist", "Noto Sans SC", system-ui, sans-serif);
   font-size: 13px;
 }
 .writing-chat[data-mode="sidebar"] {
@@ -369,10 +395,10 @@
 .writing-chat-composer {
   flex: none;
   margin: 10px 16px 16px;
-  border: 1px solid var(--page-line);
+  border: 1px solid var(--writing-control-line);
   border-radius: var(--editor-assistant-radius);
   background: var(--page-bg);
-  padding: 12px;
+  padding: 10px 12px;
   box-shadow: 0 2px 6px rgb(0 0 0 / 3%);
 }
 .writing-context-chip {
@@ -388,24 +414,26 @@
 .writing-chat-composer textarea {
   display: block;
   width: 100%;
-  min-height: 64px;
+  min-height: 24px;
   max-height: 180px;
   resize: none;
   border: 0;
   outline: 0;
   background: transparent;
-  padding: 12px 2px;
+  padding: 0;
   color: var(--page-text);
-  line-height: 1.6;
+  font: 13px/24px var(--font-sans, "Geist", "Noto Sans SC", system-ui, sans-serif);
+  margin-bottom: 6px;
 }
 .writing-chat-composer textarea::placeholder {
   color: var(--page-subtle);
   opacity: 0.6;
 }
-.writing-chat-composer footer {
+.writing-composer-footer {
   display: flex;
+  width: 100%;
+  min-width: 0;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
   color: var(--page-subtle);
   font-size: 10px;
@@ -451,7 +479,7 @@
   border: 0;
   background: transparent;
   color: var(--page-text);
-  font: 12px/1.7 var(--font-sans);
+  font: 12px/1.7 var(--font-sans, "Geist", "Noto Sans SC", system-ui, sans-serif);
   overflow: hidden;
 }
 .writing-inline-heading {
@@ -543,5 +571,348 @@
   .markdown-tool-row {
     flex-wrap: wrap;
     gap: 4px;
+  }
+}
+.writing-sources {
+  margin: 12px 0;
+  border: 1px solid var(--page-line);
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 12px;
+}
+.writing-sources h4 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+.writing-sources ol {
+  display: grid;
+  gap: 10px;
+}
+.writing-sources-expanded {
+  max-height: 320px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.writing-source-title {
+  display: -webkit-box;
+  min-width: 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.writing-sources li p {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.writing-sources-toggle {
+  margin-top: 12px;
+  padding: 4px 0;
+  color: var(--page-accent);
+  font-size: 12px;
+}
+.writing-search-toggle {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 5px;
+  position: relative;
+  border: 1px solid var(--writing-control-line);
+  border-radius: 20px;
+  padding: 4px 9px;
+  min-height: 28px;
+  color: var(--page-subtle);
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.writing-search-toggle input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: inherit;
+}
+.writing-search-toggle:has(input:checked) {
+  color: var(--writing-control-active);
+  border-color: var(--writing-control-focus);
+  background: var(--writing-control-selected);
+}
+.writing-search-toggle:has(input:disabled) {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.writing-composer-error {
+  color: var(--page-warm);
+  font-size: 12px;
+}
+.writing-inline-prompt > [hidden] {
+  display: none;
+}
+.writing-sources a {
+  display: flex;
+  align-items: start;
+  gap: 6px;
+  color: var(--page-text);
+  overflow-wrap: anywhere;
+}
+.writing-sources a:hover {
+  color: var(--page-accent);
+}
+.writing-sources a svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.writing-sources li p,
+.writing-source-group {
+  margin: 4px 0 0 28px;
+  color: var(--page-subtle);
+  font-size: 11px;
+}
+.writing-source-index {
+  flex-shrink: 0;
+  color: var(--page-accent);
+  font-family: monospace;
+}
+.writing-composer-menu {
+  flex: none;
+}
+.writing-composer-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 6px;
+  color: var(--page-subtle);
+  font: 18px/1 var(--font-sans, "Geist", "Noto Sans SC", system-ui, sans-serif);
+  cursor: pointer;
+  list-style: none;
+}
+.writing-composer-icon::-webkit-details-marker {
+  display: none;
+}
+.writing-composer-icon:hover,
+.writing-composer-menu[open] > summary {
+  background: var(--page-paper);
+  color: var(--page-text);
+}
+.writing-composer-options {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  width: min(228px, calc(100vw - 16px));
+  border: 1px solid var(--page-line);
+  border-radius: 12px;
+  padding: 5px;
+  background: var(--page-bg);
+  color: var(--page-text);
+  box-shadow: var(--editor-assistant-shadow);
+  font-family: var(--font-sans, "Geist", "Noto Sans SC", system-ui, sans-serif);
+}
+.writing-composer-options button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 36px;
+  border-radius: 7px;
+  padding: 8px 10px;
+  text-align: left;
+  white-space: nowrap;
+  font: 12px/20px var(--font-sans, "Geist", "Noto Sans SC", system-ui, sans-serif);
+}
+.writing-composer-options button:hover {
+  background: var(--page-paper);
+}
+.writing-composer-context {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  font-size: 12px;
+}
+.writing-composer-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex: none;
+}
+.writing-composer-footer > .writing-send {
+  margin-left: auto;
+}
+.writing-composer-notice {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.writing-composer-options button[aria-pressed="true"] {
+  background: var(--page-paper);
+  color: var(--page-accent);
+}
+.writing-composer-options button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.writing-image-list {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 8px 0;
+}
+.writing-image-list > div {
+  position: relative;
+}
+.writing-image-list img {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  border: 1px solid var(--page-line);
+  border-radius: 12px;
+}
+.writing-image-list button {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background: var(--page-bg);
+  border: 1px solid var(--page-line);
+  border-radius: 50%;
+  padding: 3px;
+}
+
+/* 空态保留单行入口；内容和附件出现后，操作区自然落到第二行。 */
+.writing-inline-prompt:focus-within,
+.writing-chat-composer:focus-within {
+  border-color: var(--writing-control-focus);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--writing-control-focus) 10%, transparent),
+    0 8px 24px rgb(0 0 0 / 4%);
+}
+.writing-inline-prompt > .writing-image-list,
+.writing-inline-prompt > .writing-composer-error {
+  grid-column: 1 / -1;
+}
+.writing-inline-prompt > .writing-composer-footer {
+  width: auto;
+}
+.writing-inline-prompt[data-expanded="true"] > textarea {
+  grid-column: 2 / -1;
+}
+.writing-inline-prompt[data-expanded="true"] > .writing-composer-footer {
+  grid-column: 1 / -1;
+  margin-top: 2px;
+}
+.writing-inline-prompt .writing-search-label {
+  display: none;
+}
+.writing-inline-prompt[data-expanded="true"] .writing-search-label {
+  display: inline;
+}
+.writing-inline-prompt .writing-composer-menu {
+  align-self: start;
+}
+.writing-wand {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--page-line);
+  border-radius: 50%;
+  background: var(--page-bg);
+  color: var(--page-text);
+  box-shadow: 0 2px 6px rgb(0 0 0 / 5%);
+}
+.writing-chat-input-row {
+  display: flex;
+  align-items: start;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.writing-chat-input-row textarea {
+  min-width: 0;
+  margin-top: 3px;
+}
+.writing-search-toggle:has(input:focus-visible) {
+  outline: 2px solid var(--writing-control-focus);
+  outline-offset: 2px;
+}
+.writing-attach {
+  border-radius: 50%;
+  background: var(--page-paper);
+}
+.writing-attach:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.writing-chat-composer .writing-attach {
+  margin-left: auto;
+}
+.writing-chat-composer .writing-send {
+  margin-left: 0;
+}
+.writing-send:not(:disabled) {
+  background: var(--page-text);
+  box-shadow: 0 2px 5px rgb(0 0 0 / 10%);
+}
+.writing-progress summary {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  list-style: none;
+}
+.writing-progress summary::after {
+  content: "⌄";
+  transition: transform 180ms ease;
+}
+.writing-progress[open] summary::after {
+  transform: rotate(180deg);
+}
+/* 动画只标记真实进行中的状态；减少动态效果时保留静态可读文字。 */
+.writing-thinking-text {
+  background: linear-gradient(
+    100deg,
+    var(--page-subtle) 15%,
+    var(--page-subtle) 32%,
+    var(--writing-control-active) 45%,
+    var(--page-text) 50%,
+    var(--writing-control-active) 55%,
+    var(--page-subtle) 68%
+  );
+  background-size: 250% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  animation: writing-shimmer 2.4s ease-in-out infinite;
+}
+.writing-generating svg {
+  animation: writing-orbit 2s linear infinite;
+}
+@keyframes writing-shimmer {
+  from {
+    background-position: 120% 0;
+  }
+  to {
+    background-position: -120% 0;
+  }
+}
+@keyframes writing-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .writing-thinking-text,
+  .writing-generating svg {
+    animation: none;
+  }
+  .writing-thinking-text {
+    background: none;
+    color: var(--page-subtle);
   }
 }

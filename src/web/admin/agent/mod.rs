@@ -1,6 +1,8 @@
 //! Agent 模型注册、任务绑定与生成接口。
 
+pub mod skills;
 pub mod summary;
+pub mod tools;
 pub mod writing;
 use axum::{
     Json,
@@ -20,6 +22,30 @@ use crate::{
     entity::{agent_binding, agent_provider},
     infrastructure::secrets,
 };
+
+/// 写作与摘要共用的请求级能力加载边界，技能包和工具权限独立组合。
+pub(super) async fn task_context(
+    state: &AppState,
+    task: AgentTask,
+    base: &str,
+    invocation: &str,
+) -> Result<crate::agent::context::AgentContext, Response> {
+    crate::agent::context::AgentContext::prepare(
+        state.skills.clone(),
+        state.tools.clone(),
+        task,
+        base,
+        invocation,
+    )
+    .await
+    .map_err(|_| {
+        error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "agent_context_unavailable",
+            "Agent 技能或工具配置暂时不可用，请检查服务端配置",
+        )
+    })
+}
 
 /// 模型配置写入；更新时 API key 可留空以保留原密钥。
 #[derive(Deserialize, ToSchema)]

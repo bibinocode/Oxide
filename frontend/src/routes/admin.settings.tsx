@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { Link, createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { csrfHeaders, useAdminSession } from "../features/admin/AdminSession";
 import { apiRequest } from "../lib/api/client";
@@ -7,7 +7,6 @@ import { emptyPresentation } from "../lib/api/types";
 import { SiteModulesEditor } from "../features/admin/settings/SiteModulesEditor";
 import { TaxonomyEditor } from "../features/admin/settings/TaxonomyEditor";
 import { ProviderSection } from "../features/admin/settings/StorageSettings";
-import { AgentSettings } from "../features/admin/agent/AgentSettings";
 import { HomeIntroductionEditor } from "../features/admin/home/HomeIntroductionEditor";
 
 export const Route = createFileRoute("/admin/settings")({ component: SettingsPage });
@@ -214,7 +213,13 @@ function SettingsPage() {
       )}
       {section === "agent" && (
         <div className="max-w-5xl">
-          <AgentSettings />
+          <h2 className="text-lg font-semibold">Agent 配置已迁移到独立工作区</h2>
+          <p className="my-4 text-sm text-muted">
+            在同一入口管理 Skills、模型与任务，后续也将在这里配置 Agent 工具。
+          </p>
+          <Link to="/admin/agent" search={{ tab: "models" }} className="button-primary">
+            打开 Agent 配置
+          </Link>
         </div>
       )}
     </section>

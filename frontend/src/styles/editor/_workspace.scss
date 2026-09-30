@@ -300,3 +300,9 @@
   background: var(--page-text);
   color: white;
 }
+.editor-draft-notice {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--page-line);
+  color: var(--page-warm);
+  font-size: 12px;
+}

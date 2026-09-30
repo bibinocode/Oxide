@@ -159,6 +159,13 @@
   .markdown-editor .editor-workspace[data-preview="false"] {
     grid-template-columns: minmax(0, 1fr);
   }
+  .markdown-editor .editor-workspace[data-preview="false"] .markdown-source .cm-content {
+    flex: 0 1 840px;
+    width: min(100%, 840px);
+    min-width: 0;
+    max-width: 840px;
+    margin-inline: auto;
+  }
   .markdown-editor .editor-pane {
     display: block !important;
     height: 100%;
@@ -175,8 +182,33 @@
   min-height: 0;
   overflow: hidden;
 }
-.editor-writing-layout > .editor-workspace {
+.editor-writing-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
   min-width: 0;
+  min-height: 0;
+}
+.editor-writing-main > .editor-workspace {
+  min-width: 0;
+}
+.markdown-tool-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  width: 100%;
+  min-width: 0;
+}
+.markdown-tool-row[data-preview="false"] .markdown-tool-content {
+  max-width: 840px;
+  margin-inline: auto;
+}
+@media (min-width: 960px) {
+  .markdown-tool-row[data-preview="false"] .markdown-tool-content {
+    width: calc(100% - 20px);
+  }
 }
 .editor-resize-handle {
   position: relative;

@@ -45,16 +45,22 @@ export function PublishPanel(props: PublishPanelProps) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => {
+    const controller = new AbortController();
     dialog.current?.showModal();
-    apiRequest<Asset[]>("/api/v1/admin/assets")
-      .then((items) =>
-        setAssets(
-          items.filter(
-            (item) => item.visibility === "public" && item.mime_type.startsWith("image/"),
-          ),
-        ),
-      )
-      .catch((cause) => setError(cause.message));
+    apiRequest<Asset[]>("/api/v1/admin/assets", { signal: controller.signal })
+      .then((items) => {
+        if (!controller.signal.aborted)
+          setAssets(
+            items.filter(
+              (item) => item.visibility === "public" && item.mime_type.startsWith("image/"),
+            ),
+          );
+      })
+      .catch((cause: unknown) => {
+        if (!controller.signal.aborted)
+          setError(cause instanceof Error ? cause.message : "封面素材加载失败");
+      });
+    return () => controller.abort();
   }, []);
   async function upload(file: File) {
     setUploading(true);

@@ -53,6 +53,13 @@ async fn main() -> Result<()> {
     tokio::spawn(run_worker(db.clone(), search.clone()));
     // 初始化应用状态
     let state: AppState = AppState {
+        tools: Arc::new(rust_oxide::agent::tools::ToolRegistry::new(
+            std::path::PathBuf::from(config.agent_tools_config),
+            config.web_search_api_key,
+        )?),
+        skills: Arc::new(rust_oxide::infrastructure::agent_skills::SkillStore::new(
+            std::path::PathBuf::from(config.agent_skills_dir),
+        )),
         articles: Arc::new(SeaOrmArticleRepository::new(db.clone())),
         db,
         redis,

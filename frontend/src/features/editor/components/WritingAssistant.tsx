@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { SidebarResizeHandle } from "./SidebarResizeHandle";
 import { WritingMarkdown } from "./WritingMarkdown";
+import { WritingSources } from "./WritingSources";
+import { observeComposer, resizeComposer } from "../composerSize";
+import aiChatGif from "../../../assets/ai-caht.gif";
 import {
   ArrowUp,
   Check,
@@ -14,6 +17,10 @@ import {
   X,
   PictureInPicture2,
   ChevronDown,
+  Globe,
+  Paperclip,
+  LoaderCircle,
+  BrainCircuit,
 } from "lucide-react";
 import type { ConversationMode, useWritingAssistant } from "../hooks/useWritingAssistant";
 
@@ -30,6 +37,7 @@ export function WritingSelectionActions({ assistant }: { assistant: Assistant })
   if (
     !assistant.selection.trim() ||
     !assistant.selectionAnchor ||
+    assistant.panelOpen ||
     assistant.inlineOpen ||
     assistant.action === "improve" ||
     assistant.action === "continue" ||
@@ -62,6 +70,7 @@ export function WritingAssistant({ assistant }: { assistant: Assistant }) {
   const panel = useRef<HTMLElement>(null);
   const [sidebarWidth, setSidebarWidth] = useState(400);
   const input = useRef<HTMLTextAreaElement>(null);
+  const imageInput = useRef<HTMLInputElement>(null);
   const conversation = useRef<HTMLDivElement>(null);
   const follow = useRef(true);
   const [copied, setCopied] = useState<number | null>(null);
@@ -86,6 +95,16 @@ export function WritingAssistant({ assistant }: { assistant: Assistant }) {
   }
   useEffect(() => {
     if (assistant.panelOpen) input.current?.focus();
+  }, [assistant.panelOpen]);
+  useEffect(() => {
+    if (input.current) resizeComposer(input.current);
+  }, [assistant.instruction, assistant.panelOpen]);
+  useEffect(() => {
+    if (!assistant.panelOpen || !input.current) return;
+    const disconnect = observeComposer(input.current, () => {});
+    return () => {
+      disconnect();
+    };
   }, [assistant.panelOpen]);
   useEffect(() => {
     if (follow.current && conversation.current)
@@ -163,7 +182,7 @@ export function WritingAssistant({ assistant }: { assistant: Assistant }) {
         }}
       >
         <span className="writing-ai-badge">
-          <Sparkles size={17} />
+          <img className="writing-ai-avatar" src={aiChatGif} alt="" />
         </span>
         <span className="writing-chat-title">
           {assistant.messages.find((item) => item.role === "user")?.content || "AI 写作对话"}
@@ -232,12 +251,38 @@ export function WritingAssistant({ assistant }: { assistant: Assistant }) {
             aria-label={message.role === "user" ? "我的问题" : "AI 回复"}
           >
             {message.role === "user" ? (
-              <p className="writing-user-bubble">{message.content}</p>
+              <div className="writing-user-bubble">
+                <p>{message.content}</p>
+                {message.images?.length ? (
+                  <div className="writing-image-list">
+                    {message.images.map((image, index) => (
+                      <img
+                        key={index}
+                        src={"data:" + image.mime_type + ";base64," + image.data}
+                        alt={image.name}
+                      />
+                    ))}
+                  </div>
+                ) : null}
+              </div>
             ) : (
               <>
                 {message.progress.length > 0 && (
                   <details className="writing-progress">
-                    <summary>{message.status === "streaming" ? "正在处理" : "处理过程"}</summary>
+                    <summary>
+                      <BrainCircuit size={14} />
+                      <span
+                        className={
+                          message.status === "streaming" ? "writing-thinking-text" : undefined
+                        }
+                      >
+                        {message.status === "streaming"
+                          ? message.progress.at(-1)?.kind === "reasoning"
+                            ? "正在思考"
+                            : "正在处理"
+                          : "处理过程"}
+                      </span>
+                    </summary>
                     {message.progress.map((entry) => (
                       <div key={entry.kind + entry.id} data-kind={entry.kind}>
                         <span>
@@ -257,12 +302,20 @@ export function WritingAssistant({ assistant }: { assistant: Assistant }) {
                     <WritingMarkdown content={message.content} />
                   </div>
                 )}
-                {message.status === "streaming" && (
-                  <div className="writing-generating" role="status">
-                    <Sparkles size={14} />
-                    {message.content ? "正在生成" : "正在准备"}
-                  </div>
-                )}
+                <WritingSources progress={message.progress} />
+                {message.status === "streaming" &&
+                  (message.content || !message.progress.length) && (
+                    <div className="writing-generating" role="status">
+                      <LoaderCircle size={14} />
+                      <span className="writing-thinking-text">
+                        {message.content
+                          ? "正在生成"
+                          : message.progress.some((entry) => entry.kind === "reasoning")
+                            ? "正在思考"
+                            : "正在工作"}
+                      </span>
+                    </div>
+                  )}
                 {message.status === "stopped" && (
                   <p className="writing-message-status">已停止生成</p>
                 )}
@@ -309,28 +362,95 @@ export function WritingAssistant({ assistant }: { assistant: Assistant }) {
         </p>
       )}
       <div className="writing-chat-composer">
-        <span className="writing-context-chip">
-          <Sparkles size={12} /> 当前文章 ·{" "}
-          {assistant.messages.filter((item) => item.role === "user").length} 轮对话
-        </span>
-        <textarea
-          ref={input}
-          value={assistant.instruction}
-          onChange={(event) => assistant.setInstruction(event.target.value)}
-          placeholder="使用 AI 处理各种任务…"
-          aria-label="AI 对话输入"
-          maxLength={1000}
-          rows={3}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-              event.preventDefault();
-              follow.current = true;
-              void assistant.generate();
-            }
+        <input
+          ref={imageInput}
+          type="file"
+          accept="image/png,image/jpeg,image/gif,image/webp"
+          multiple
+          className="hidden"
+          aria-label="AI 图片附件"
+          onChange={(event) => {
+            void assistant.attachImages(Array.from(event.target.files ?? []));
+            event.target.value = "";
           }}
         />
-        <footer>
-          <span role="status">{notice || "Enter 发送 · Shift+Enter 换行"}</span>
+        {assistant.images.length > 0 && (
+          <div className="writing-image-list">
+            {assistant.images.map((image, index) => (
+              <div key={index}>
+                <img src={"data:" + image.mime_type + ";base64," + image.data} alt={image.name} />
+                <button
+                  type="button"
+                  disabled={assistant.pending}
+                  aria-label={"移除图片 " + image.name}
+                  onClick={() => assistant.removeImage(index)}
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="writing-chat-input-row">
+          <span className="writing-ai-badge writing-wand" aria-hidden="true">
+            <img className="writing-ai-avatar" src={aiChatGif} alt="" />
+          </span>
+          <textarea
+            ref={input}
+            value={assistant.instruction}
+            onChange={(event) => assistant.setInstruction(event.target.value)}
+            placeholder="使用 AI 处理各种任务…"
+            aria-label="AI 对话输入"
+            maxLength={1000}
+            rows={1}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                event.preventDefault();
+                follow.current = true;
+                void assistant.generate();
+              }
+            }}
+          />
+        </div>
+        <footer className="writing-composer-footer">
+          <label
+            className="writing-search-toggle"
+            title={
+              assistant.capabilities?.web_search_available
+                ? "允许 AI 为本次消息联网搜索并读取公开文章链接"
+                : "请在 Agent 工具配置中启用并授权写作"
+            }
+          >
+            <input
+              type="checkbox"
+              checked={assistant.webSearch && !!assistant.capabilities?.web_search_available}
+              disabled={assistant.pending || !assistant.capabilities?.web_search_available}
+              onChange={(event) => assistant.setWebSearch(event.target.checked)}
+            />
+            <Globe size={13} /> 联网搜索
+          </label>
+          <span className="writing-composer-notice" role="status">
+            {notice}
+          </span>
+          <button
+            type="button"
+            className="writing-composer-icon writing-attach"
+            aria-label="添加图片"
+            disabled={
+              assistant.pending ||
+              assistant.readingImages ||
+              !assistant.capabilities?.image_supported ||
+              assistant.images.length >= 3
+            }
+            onClick={() => imageInput.current?.click()}
+            title={
+              assistant.capabilities?.image_supported
+                ? "添加图片 · 最多 3 张，每张不超过 2 MiB"
+                : "当前模型不支持图片理解"
+            }
+          >
+            <Paperclip size={17} />
+          </button>
           {assistant.pending ? (
             <button
               type="button"
@@ -344,7 +464,10 @@ export function WritingAssistant({ assistant }: { assistant: Assistant }) {
             <button
               type="button"
               className="writing-send"
-              disabled={!assistant.instruction.trim()}
+              disabled={
+                assistant.readingImages ||
+                (!assistant.instruction.trim() && !assistant.images.length)
+              }
               onClick={() => {
                 follow.current = true;
                 void assistant.generate();

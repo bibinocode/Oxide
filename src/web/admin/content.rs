@@ -38,6 +38,12 @@ pub struct AdminPageQuery {
 /// 文章写入内容；发布状态由单独接口控制。
 #[derive(Deserialize, ToSchema)]
 pub struct ArticleInput {
+    /// 自动保存使用最后已知版本，防止多标签页或外部同步静默覆盖。
+    #[serde(default)]
+    pub expected_updated_at: Option<DateTime<Utc>>,
+    /// 自动保存仅允许写草稿；已发布正文必须由用户显式保存。
+    #[serde(default)]
+    pub draft_only: bool,
     /// 唯一 slug，仅允许小写字母、数字和中划线。
     pub slug: String,
     /// 文章标题。
@@ -295,11 +301,21 @@ pub async fn update(
         let txn = state.db.begin().await?;
         let Some(old) = article::Entity::find()
             .filter(article::Column::PublicId.eq(public_id))
+            .lock_exclusive()
             .one(&txn)
             .await?
         else {
             return Ok::<_, sea_orm::DbErr>(None);
         };
+        if input.draft_only && old.status != ArticleStatus::Draft {
+            return Err(sea_orm::DbErr::Custom("autosave_published".into()));
+        }
+        if input
+            .expected_updated_at
+            .is_some_and(|expected| expected != old.updated_at)
+        {
+            return Err(sea_orm::DbErr::Custom("article_version_conflict".into()));
+        }
         let now = Utc::now();
         article_revision::ActiveModel {
             article_id: Set(old.id),
@@ -327,6 +343,16 @@ pub async fn update(
     match result {
         Ok(Some(row)) => Json(AdminArticleResponse::from(row)).into_response(),
         Ok(None) => error(StatusCode::NOT_FOUND, "article_not_found", "文章不存在"),
+        Err(sea_orm::DbErr::Custom(reason)) if reason == "autosave_published" => error(
+            StatusCode::CONFLICT,
+            "autosave_published",
+            "文章已发布，自动保存不会修改公开正文，请刷新后核对",
+        ),
+        Err(sea_orm::DbErr::Custom(reason)) if reason == "article_version_conflict" => error(
+            StatusCode::CONFLICT,
+            "article_version_conflict",
+            "服务器文章已被更新，已保留本地草稿，请刷新后核对",
+        ),
         Err(err) => {
             tracing::error!(error = %err, "更新文章失败");
             error(
@@ -547,6 +573,8 @@ mod tests {
     #[test]
     fn rejects_invalid_slug_and_unsafe_document() {
         let mut input = ArticleInput {
+            expected_updated_at: None,
+            draft_only: false,
             slug: "Hello!".into(),
             title: "标题".into(),
             summary: None,
