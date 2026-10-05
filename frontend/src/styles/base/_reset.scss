@@ -29,14 +29,14 @@ button {
   outline-offset: 3px;
 }
 ::selection {
-  background: #dce8ad;
+  background: var(--page-selection-bg);
 }
 .theme-control {
   display: inline-flex;
   gap: 2px;
   margin-top: 18px;
   padding: 3px;
-  border: 1px solid var(--page-line);
+  border: var(--border-hairline) solid var(--page-line);
   border-radius: 4px;
 }
 .theme-control button {
@@ -55,20 +55,17 @@ button {
   margin-top: 0;
   flex: none;
 }
-:root[data-theme="dark"] .column-guides {
-  border-color: var(--page-line);
-}
 :root[data-theme="dark"] .pixel-mark i {
   background: var(--page-subtle);
 }
 :root[data-theme="dark"] .site-dock {
   border-color: var(--page-line);
-  background: rgb(37 42 41 / 92%);
+  background: var(--dock-bg);
   box-shadow: 0 7px 24px rgb(0 0 0 / 25%);
 }
 :root[data-theme="dark"] .site-dock a:hover,
 :root[data-theme="dark"] .site-dock a[data-status="active"] {
-  background: #38403b;
+  background: var(--preferences-control-bg);
   color: var(--page-text);
 }
 :root[data-theme="dark"] .catalog-row-leader {
@@ -87,11 +84,11 @@ button {
   border-left-color: var(--page-text);
 }
 :root[data-theme="dark"] .markdown-source .cm-selectionBackground {
-  background: #4d6258;
+  background: var(--page-selection-bg);
 }
 :root[data-theme="dark"] .article-reader .article-prose pre.shiki,
 :root[data-theme="dark"] .prose-blog pre.shiki {
-  background: #242b28 !important;
+  background: var(--page-paper) !important;
   color: var(--page-text) !important;
   border-color: var(--page-line);
 }
@@ -99,15 +96,20 @@ button {
   color: var(--shiki-dark) !important;
 }
 :root[data-theme="dark"] .skeleton-line {
-  background-image: linear-gradient(90deg, #303733, #414a43, #303733);
+  background-image: linear-gradient(
+    90deg,
+    var(--page-paper),
+    var(--preferences-control-bg),
+    var(--page-paper)
+  );
 }
 :root[data-theme="dark"] .button-primary {
   color: var(--page-bg);
 }
 :root[data-theme="dark"] .button-primary:hover {
-  background: #b9c9b9;
+  background: var(--portrait-ink);
 }
 :root[data-theme="dark"] ::selection {
-  background: #465e4a;
+  background: var(--page-selection-bg);
   color: var(--page-text);
 }

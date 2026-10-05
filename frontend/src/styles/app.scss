@@ -1,11 +1,14 @@
 @use "./base/reset";
 @use "./layout/public";
+@use "./layout/preferences";
 @use "./admin/shell";
 @use "./editor/workspace";
 @use "./shared/controls";
 @use "./article/preview";
 @use "./responsive";
 @use "./article/reader";
+@use "./article/columns";
+@use "./article/archive";
 @use "./layout/footer";
 @use "./contact/preview" as contactPreview;
 @use "./shared/motion";
@@ -13,7 +16,11 @@
 @use "./editor/editor";
 @use "./editor/writing-assistant";
 @use "./home/intro";
+@use "./home/summary";
 @use "./contact/xiaohongshu";
 @use "./home/portrait";
 @use "./admin/home-intro";
 @use "./admin/agent";
+
+@use "./layout/projects";
+@use "./editor/image-generator";

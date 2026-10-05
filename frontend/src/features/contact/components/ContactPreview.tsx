@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, type CSSProperties } from "react";
 import { CodeXml, Mail, Play, Send } from "lucide-react";
 import type { SiteItem, XiaohongshuCard } from "../../../lib/api/types";
 import { getSocialPreview, type SocialPreviewData } from "../socialPreview";
@@ -26,12 +26,14 @@ export function ContactPreview({
   xiaohongshuCard?: XiaohongshuCard;
 }) {
   const wrapper = useRef<HTMLSpanElement>(null);
+  // Popover 顶层不受首页容器查询、肖像和列表的局部层级影响。
+  const card = useRef<HTMLSpanElement>(null);
   const [profile, setProfile] = useState<SocialPreviewData | null>(null);
   const [webPreview, setWebPreview] = useState<WebPreview | null>(null);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
   const [avatarFailed, setAvatarFailed] = useState(false);
-  const [cardLeft, setCardLeft] = useState(-14);
+  const [position, setPosition] = useState({ left: 16, top: "auto", bottom: "auto" });
   const email = item.url.startsWith("mailto:") ? item.url.slice(7).split("?")[0] : "";
   const parsed = parseProfile(item.url);
   const service: Service = email ? "email" : (parsed?.service ?? "other");
@@ -50,8 +52,13 @@ export function ContactPreview({
   function load() {
     const bounds = wrapper.current?.getBoundingClientRect();
     if (bounds) {
-      setCardLeft(Math.max(16 - bounds.left, Math.min(-14, window.innerWidth - bounds.left - 310)));
+      setPosition({
+        left: Math.max(16, Math.min(bounds.left - 14, window.innerWidth - 310)),
+        top: placement === "bottom" ? `${bounds.bottom + 9}px` : "auto",
+        bottom: placement === "top" ? `${window.innerHeight - bounds.top + 9}px` : "auto",
+      });
     }
+    if (!card.current?.matches(":popover-open")) card.current?.showPopover();
     if (service === "email" || profile || webPreview || loading || failed) return;
     if (service === "other") {
       if (!/^https?:\/\//.test(href)) return;
@@ -70,7 +77,18 @@ export function ContactPreview({
   }
 
   return (
-    <span ref={wrapper} className="contact-preview" onPointerEnter={load} onFocus={load}>
+    <span
+      ref={wrapper}
+      className="contact-preview"
+      onPointerEnter={load}
+      onFocus={load}
+      onPointerLeave={() => {
+        if (!wrapper.current?.matches(":focus-within")) card.current?.hidePopover();
+      }}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) card.current?.hidePopover();
+      }}
+    >
       <a
         href={href}
         target={service === "email" || href.startsWith("/") ? undefined : "_blank"}
@@ -81,8 +99,16 @@ export function ContactPreview({
         {trigger ?? item.title}
       </a>
       <span
-        className={`contact-preview-card contact-card-${service} ${placement === "bottom" ? "contact-preview-card-bottom" : ""}`}
-        style={{ left: cardLeft }}
+        ref={card}
+        popover="auto"
+        className={`contact-preview-card contact-card-${service}`}
+        style={
+          {
+            "--contact-left": `${position.left}px`,
+            "--contact-top": position.top,
+            "--contact-bottom": position.bottom,
+          } as CSSProperties
+        }
         aria-hidden="true"
       >
         {service === "email" ? (

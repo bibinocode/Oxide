@@ -17,7 +17,7 @@ use tantivy::{
 };
 
 use crate::entity::{
-    article, search_job,
+    article, paid_column, search_job,
     status::{ArticleStatus, SearchAction, SearchJobStatus},
 };
 
@@ -76,7 +76,16 @@ impl SearchEngine {
         for row in rows {
             writer.delete_term(Term::from_field_text(self.id, &row.id.to_string()));
             if row.status == ArticleStatus::Published {
-                let body = document_text(&row.document);
+                // 付费文章的全文不能进入可由公开搜索探测的索引。
+                let body = if row.subscriber_only {
+                    let preview = crate::domain::article::render::preview_html(&row.rendered_html);
+                    scraper::Html::parse_fragment(&preview)
+                        .root_element()
+                        .text()
+                        .collect::<String>()
+                } else {
+                    document_text(&row.document)
+                };
                 let mut document = TantivyDocument::default();
                 document.add_text(self.id, row.id.to_string());
                 document.add_text(self.title, self.tokenize(&row.title));
@@ -188,8 +197,19 @@ pub async fn rebuild(db: &DatabaseConnection, engine: Arc<SearchEngine>) -> Resu
     let mut page = 0_u64;
     let mut total = 0_u64;
     loop {
+        use sea_orm::sea_query::ExprTrait;
+        let visible_columns = sea_orm::sea_query::Query::select()
+            .column(paid_column::Column::PublicId)
+            .from(paid_column::Entity)
+            .and_where(sea_orm::sea_query::Expr::col(paid_column::Column::Visible).eq(true))
+            .to_owned();
         let rows = article::Entity::find()
             .filter(article::Column::Status.eq(ArticleStatus::Published))
+            .filter(
+                sea_orm::Condition::any()
+                    .add(article::Column::PaidColumnPublicId.is_null())
+                    .add(article::Column::PaidColumnPublicId.in_subquery(visible_columns)),
+            )
             .order_by_asc(article::Column::Id)
             .limit(100)
             .offset(page * 100)
@@ -260,6 +280,23 @@ pub async fn run_worker(db: DatabaseConnection, engine: Arc<SearchEngine>) {
                     continue;
                 }
             };
+            // 下架小册即使仍有旧发布任务，也不得重新进入公开搜索索引。
+            let row = if let Some(mut row) = row {
+                if let Some(id) = row.paid_column_public_id {
+                    match paid_column::Entity::find()
+                        .filter(paid_column::Column::PublicId.eq(id))
+                        .one(&db)
+                        .await
+                    {
+                        Ok(Some(column)) if column.visible => {}
+                        Ok(_) => row.status = ArticleStatus::Draft,
+                        Err(_) => continue,
+                    }
+                }
+                Some(row)
+            } else {
+                None
+            };
             let engine = engine.clone();
             let action = job.action;
             let article_id = job.article_id;
@@ -309,10 +346,23 @@ mod tests {
             notion_page_id: None,
             notion_last_edited_at: None,
             notion_synced_at: None,
+            paid_column_public_id: None,
+            subscriber_only: false,
+            preview_document: None,
+            preview_html: None,
         };
-        engine.upsert(row).unwrap();
+        engine.upsert(row.clone()).unwrap();
         assert_eq!(engine.search("分词", 1, 20).unwrap().1, vec![1]);
         engine.delete(1).unwrap();
         assert!(engine.search("分词", 1, 20).unwrap().1.is_empty());
+
+        // 公开文章改为付费后，搜索只保留自动试看，并忽略旧版手填的全文试看。
+        let mut paid = row;
+        paid.subscriber_only = true;
+        paid.rendered_html = "<p>previewword padding padding hiddenword</p>".into();
+        paid.preview_document = Some(serde_json::json!({"type":"markdown","source":"hiddenword"}));
+        engine.upsert(paid).unwrap();
+        assert_eq!(engine.search("previewword", 1, 20).unwrap().1, vec![1]);
+        assert!(engine.search("hiddenword", 1, 20).unwrap().1.is_empty());
     }
 }

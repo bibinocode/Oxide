@@ -376,6 +376,10 @@ pub async fn sync(
                 notion_page_id: Set(Some(page_id)),
                 notion_last_edited_at: Set(Some(page.last_edited_at)),
                 notion_synced_at: Set(Some(now)),
+                paid_column_public_id: Set(None),
+                subscriber_only: Set(false),
+                preview_document: Set(None),
+                preview_html: Set(None),
             }
             .insert(&txn)
             .await?

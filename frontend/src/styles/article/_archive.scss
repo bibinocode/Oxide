@@ -1,0 +1,33 @@
+/* 参考 cali.so 的年份标题与淡色页码，目录行继续复用全站点线样式。 */
+.archive-year {
+  position: relative;
+  isolation: isolate;
+}
+.archive-taxonomy {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  border-block: var(--border-hairline) solid var(--page-line);
+  padding-block: 10px;
+  font-size: 12px;
+  color: var(--page-subtle);
+}
+.archive-taxonomy a:hover,
+.archive-taxonomy a:focus-visible {
+  color: var(--page-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.archive-year-folio {
+  position: absolute;
+  z-index: -1;
+  top: -18px;
+  right: 0;
+  color: color-mix(in srgb, var(--page-subtle) 9%, transparent);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 4.5rem;
+  line-height: 1;
+  letter-spacing: -0.08em;
+  pointer-events: none;
+  user-select: none;
+}

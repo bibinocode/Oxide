@@ -1,0 +1,850 @@
+{
+  "meta": {
+    "title": "Oxide — 内容平台与任务型智能体",
+    "lang": "zh-CN"
+  },
+  "canvas": {
+    "width": 1440,
+    "height": 1500,
+    "duration": 16,
+    "fps": 20,
+    "preroll": 6
+  },
+  "theme": {
+    "preset": "terminal-dark",
+    "font": "\"SFMono-Regular\",\"Menlo\",\"DejaVu Sans Mono\",\"PingFang SC\",\"Noto Sans CJK SC\",\"Microsoft YaHei\",monospace",
+    "fontSize": 21,
+    "lineHeight": 30,
+    "colors": {
+      "bg": "#111419",
+      "bar": "#22272f",
+      "dim": "#9ba6b7",
+      "fg": "#e5e9f0",
+      "wh": "#ffffff",
+      "cy": "#88e6cf",
+      "bl": "#91b9ff",
+      "pu": "#c4a5fa",
+      "gr": "#8dddb0",
+      "ye": "#f0ca88",
+      "mute": "#b5becc"
+    }
+  },
+  "titlebar": {
+    "text": "~/oxide  —  动态架构面板  —  演示会话",
+    "height": 42,
+    "size": 16
+  },
+  "clock": {
+    "start": "00:00:00",
+    "rate": 1
+  },
+  "credit": {
+    "text": "风格：@thedelost / @slashui · 引擎：ythx-101/live-panel-skill · 动画与计数均为模拟",
+    "y": 1477,
+    "size": 14
+  },
+  "machines": {
+    "tasks": {
+      "type": "triggers",
+      "period": 4,
+      "on": 3,
+      "t0": 0,
+      "color": "pu",
+      "callsStart": 0,
+      "onText": "调用中",
+      "offText": "空闲",
+      "cps": 20,
+      "items": [
+        {
+          "name": "写作 / 摘要",
+          "adv": [
+            "生成候选文本",
+            "管理员确认采用"
+          ]
+        },
+        {
+          "name": "图片生成",
+          "adv": [
+            "校验图片内容",
+            "存入 OSS 素材库"
+          ]
+        },
+        {
+          "name": "评论审核",
+          "adv": [
+            "通过 / 拒绝",
+            "不确定 → 人工复核"
+          ]
+        }
+      ],
+      "log": {
+        "who": "智能体",
+        "c": "pu",
+        "start": {
+          "m": "{name}：调用已绑定模型"
+        },
+        "end": {
+          "m": "{name}：校验完成，返回结果"
+        }
+      }
+    },
+    "index": {
+      "type": "lane",
+      "period": 8,
+      "run": 5,
+      "off": 1,
+      "phase": 0,
+      "busy": "构建索引",
+      "done": [
+        "已提交"
+      ],
+      "log": {
+        "who": "检索",
+        "c": "gr",
+        "msgs": [
+          [
+            "处理持久化任务，搜索索引已更新",
+            ""
+          ]
+        ]
+      }
+    },
+    "request": {
+      "type": "cycle",
+      "period": 2.4,
+      "values": [
+        "SSR 渲染",
+        "读取接口",
+        "后台写入",
+        "提交评论"
+      ],
+      "log": {
+        "who": "前端",
+        "c": "cy"
+      }
+    }
+  },
+  "elements": [
+    {
+      "type": "text",
+      "x": 40,
+      "y": 88,
+      "t": "OXIDE // 系统架构",
+      "c": "wh",
+      "size": 32,
+      "align": "left"
+    },
+    {
+      "type": "text",
+      "x": 40,
+      "y": 132,
+      "t": "以内容为中心 · 按任务调用智能体 · 数据持久化",
+      "c": "dim",
+      "size": 20,
+      "align": "left"
+    },
+    {
+      "type": "path",
+      "points": [
+        [
+          720,
+          295
+        ],
+        [
+          720,
+          325
+        ]
+      ],
+      "color": "cy",
+      "width": 2,
+      "flow": {
+        "period": 1.5,
+        "offsets": [
+          0
+        ],
+        "color": "cy",
+        "tail": 16
+      }
+    },
+    {
+      "type": "path",
+      "points": [
+        [
+          720,
+          440
+        ],
+        [
+          720,
+          470
+        ]
+      ],
+      "color": "cy",
+      "width": 2,
+      "flow": {
+        "period": 1.8,
+        "offsets": [
+          0.4
+        ],
+        "color": "cy",
+        "tail": 16
+      }
+    },
+    {
+      "type": "path",
+      "points": [
+        [
+          720,
+          580
+        ],
+        [
+          720,
+          625
+        ]
+      ],
+      "color": "cy",
+      "width": 2,
+      "flow": {
+        "period": 1.7,
+        "offsets": [
+          0.8
+        ],
+        "color": "cy",
+        "tail": 16
+      }
+    },
+    {
+      "type": "path",
+      "points": [
+        [
+          960,
+          375
+        ],
+        [
+          1010,
+          375
+        ],
+        [
+          1010,
+          655
+        ],
+        [
+          960,
+          655
+        ]
+      ],
+      "color": "bl",
+      "width": 2,
+      "flow": {
+        "period": 2.5,
+        "offsets": [
+          0.5
+        ],
+        "color": "bl",
+        "tail": 16
+      }
+    },
+    {
+      "type": "path",
+      "points": [
+        [
+          480,
+          695
+        ],
+        [
+          370,
+          695
+        ]
+      ],
+      "color": "pu",
+      "width": 2,
+      "flow": {
+        "period": 2.2,
+        "offsets": [
+          0.3
+        ],
+        "color": "pu",
+        "tail": 16
+      }
+    },
+    {
+      "type": "path",
+      "points": [
+        [
+          205,
+          1000
+        ],
+        [
+          205,
+          1055
+        ]
+      ],
+      "color": "pu",
+      "width": 2,
+      "flow": {
+        "period": 2.8,
+        "offsets": [
+          1
+        ],
+        "color": "pu",
+        "tail": 16
+      }
+    },
+    {
+      "type": "path",
+      "points": [
+        [
+          960,
+          720
+        ],
+        [
+          1040,
+          720
+        ],
+        [
+          1040,
+          550
+        ],
+        [
+          1080,
+          550
+        ]
+      ],
+      "color": "ye",
+      "width": 2,
+      "flow": {
+        "period": 3,
+        "offsets": [
+          0.6
+        ],
+        "color": "ye",
+        "tail": 16
+      }
+    },
+    {
+      "type": "path",
+      "points": [
+        [
+          720,
+          765
+        ],
+        [
+          720,
+          820
+        ],
+        [
+          570,
+          820
+        ],
+        [
+          570,
+          870
+        ]
+      ],
+      "color": "gr",
+      "width": 2,
+      "flow": {
+        "period": 2.4,
+        "offsets": [
+          0
+        ],
+        "color": "gr",
+        "tail": 16
+      }
+    },
+    {
+      "type": "path",
+      "points": [
+        [
+          720,
+          765
+        ],
+        [
+          720,
+          820
+        ],
+        [
+          880,
+          820
+        ],
+        [
+          880,
+          870
+        ]
+      ],
+      "color": "gr",
+      "width": 2,
+      "flow": {
+        "period": 2.6,
+        "offsets": [
+          1
+        ],
+        "color": "gr",
+        "tail": 16
+      }
+    },
+    {
+      "type": "path",
+      "points": [
+        [
+          720,
+          765
+        ],
+        [
+          720,
+          800
+        ],
+        [
+          1235,
+          800
+        ],
+        [
+          1235,
+          870
+        ]
+      ],
+      "color": "gr",
+      "width": 2,
+      "flow": {
+        "period": 2.9,
+        "offsets": [
+          1.4
+        ],
+        "color": "gr",
+        "tail": 16
+      }
+    },
+    {
+      "type": "path",
+      "points": [
+        [
+          570,
+          990
+        ],
+        [
+          570,
+          1070
+        ]
+      ],
+      "color": "gr",
+      "width": 2,
+      "flow": {
+        "period": 3,
+        "offsets": [
+          0.8
+        ],
+        "color": "gr",
+        "tail": 16
+      }
+    },
+    {
+      "type": "path",
+      "points": [
+        [
+          1000,
+          1138
+        ],
+        [
+          1080,
+          1138
+        ]
+      ],
+      "color": "ye",
+      "width": 2,
+      "flow": {
+        "period": 3.2,
+        "offsets": [
+          0.3
+        ],
+        "color": "ye",
+        "tail": 16
+      }
+    },
+    {
+      "type": "box",
+      "x": 480,
+      "y": 180,
+      "w": 480,
+      "h": 115,
+      "color": "cy",
+      "pad": [
+        16,
+        18,
+        18
+      ],
+      "lines": [
+        {
+          "t": "浏览器 / RSS 阅读器",
+          "c": "cy",
+          "b": 1
+        },
+        "公开网站 + 后台管理",
+        "同源请求"
+      ]
+    },
+    {
+      "type": "box",
+      "x": 480,
+      "y": 325,
+      "w": 480,
+      "h": 115,
+      "color": "cy",
+      "pad": [
+        16,
+        18,
+        18
+      ],
+      "lines": [
+        {
+          "t": "OpenResty / HTTPS",
+          "c": "cy",
+          "b": 1
+        },
+        "反向代理 + TLS 加密",
+        "1Panel 管理入口"
+      ]
+    },
+    {
+      "type": "box",
+      "x": 480,
+      "y": 470,
+      "w": 480,
+      "h": 110,
+      "color": "cy",
+      "pad": [
+        16,
+        18,
+        18
+      ],
+      "lines": [
+        {
+          "t": "TanStack Start / React",
+          "c": "cy",
+          "b": 1
+        },
+        "服务端渲染 + 路由 + 页面交互",
+        {
+          "runs": [
+            {
+              "t": "演示请求：",
+              "c": "dim"
+            },
+            {
+              "v": "request",
+              "c": "cy"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "box",
+      "x": 480,
+      "y": 625,
+      "w": 480,
+      "h": 140,
+      "color": "bl",
+      "pad": [
+        16,
+        18,
+        18
+      ],
+      "lines": [
+        {
+          "t": "Axum 0.8.9 / Rust API",
+          "c": "bl",
+          "b": 1
+        },
+        "身份认证 / CSRF / 访问校验",
+        "内容 / 评论 / 支付权益",
+        "API / RSS / 素材 / OpenAPI"
+      ]
+    },
+    {
+      "type": "text",
+      "x": 1060,
+      "y": 360,
+      "t": "API / RSS / 素材",
+      "c": "bl",
+      "size": 18,
+      "align": "left"
+    },
+    {
+      "type": "text",
+      "x": 40,
+      "y": 555,
+      "t": "按任务绑定的 AI",
+      "c": "pu",
+      "size": 18,
+      "align": "left"
+    },
+    {
+      "type": "box",
+      "x": 40,
+      "y": 625,
+      "w": 330,
+      "h": 375,
+      "color": "pu",
+      "pad": [
+        16,
+        18,
+        18
+      ],
+      "lines": [
+        {
+          "t": "Rig 智能体核心",
+          "c": "pu",
+          "b": 1
+        },
+        "任务 → 已绑定模型",
+        {
+          "trigger": [
+            "tasks",
+            0
+          ]
+        },
+        {
+          "trigger": [
+            "tasks",
+            1
+          ]
+        },
+        {
+          "trigger": [
+            "tasks",
+            2
+          ]
+        },
+        "",
+        "按需加载技能包",
+        "搜索 / 抓取：按需授权",
+        "评论审核：禁用工具",
+        {
+          "runs": [
+            {
+              "v": "tasks.adv0",
+              "c": "pu"
+            }
+          ]
+        },
+        {
+          "runs": [
+            {
+              "v": "tasks.adv1",
+              "c": "pu"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "box",
+      "x": 40,
+      "y": 1055,
+      "w": 330,
+      "h": 150,
+      "color": "pu",
+      "pad": [
+        16,
+        18,
+        18
+      ],
+      "lines": [
+        {
+          "t": "模型提供商",
+          "c": "pu",
+          "b": 1
+        },
+        "OpenAI / DeepSeek",
+        "兼容图像生成接口",
+        "凭据加密保存"
+      ]
+    },
+    {
+      "type": "box",
+      "x": 1080,
+      "y": 470,
+      "w": 310,
+      "h": 180,
+      "color": "ye",
+      "pad": [
+        16,
+        18,
+        18
+      ],
+      "lines": [
+        {
+          "t": "素材存储",
+          "c": "ye",
+          "b": 1
+        },
+        "阿里云 OSS / 七牛 Kodo",
+        "素材上传 + AI 生图",
+        "Notion 图片转存",
+        "统一存储适配层"
+      ]
+    },
+    {
+      "type": "box",
+      "x": 440,
+      "y": 870,
+      "w": 260,
+      "h": 120,
+      "color": "gr",
+      "pad": [
+        16,
+        18,
+        18
+      ],
+      "lines": [
+        {
+          "t": "PostgreSQL 17",
+          "c": "gr",
+          "b": 1
+        },
+        "内容与订阅权益",
+        "持久化任务队列"
+      ]
+    },
+    {
+      "type": "box",
+      "x": 750,
+      "y": 870,
+      "w": 250,
+      "h": 120,
+      "color": "gr",
+      "pad": [
+        16,
+        18,
+        18
+      ],
+      "lines": [
+        {
+          "t": "Redis 7",
+          "c": "gr",
+          "b": 1
+        },
+        "会话与请求限流",
+        "审核任务短租约"
+      ]
+    },
+    {
+      "type": "box",
+      "x": 1080,
+      "y": 870,
+      "w": 310,
+      "h": 120,
+      "color": "gr",
+      "pad": [
+        16,
+        18,
+        18
+      ],
+      "lines": [
+        {
+          "t": "Jieba + Tantivy",
+          "c": "gr",
+          "b": 1
+        },
+        "本地持久化搜索索引",
+        {
+          "runs": [
+            {
+              "t": "演示状态：",
+              "c": "dim"
+            },
+            {
+              "v": "index",
+              "c": "gr"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "box",
+      "x": 440,
+      "y": 1070,
+      "w": 560,
+      "h": 145,
+      "color": "gr",
+      "pad": [
+        16,
+        18,
+        18
+      ],
+      "lines": [
+        {
+          "t": "备份容器 / 每 72 小时",
+          "c": "gr",
+          "b": 1
+        },
+        "pg_dump → age 公钥加密",
+        "上传 → 下载回验 + SHA-256 校验",
+        "新快照验证成功后，才清理旧备份"
+      ]
+    },
+    {
+      "type": "box",
+      "x": 1080,
+      "y": 1070,
+      "w": 310,
+      "h": 145,
+      "color": "ye",
+      "pad": [
+        16,
+        18,
+        18
+      ],
+      "lines": [
+        {
+          "t": "七牛云备份与恢复",
+          "c": "ye",
+          "b": 1
+        },
+        "加密数据库快照",
+        "保留最新已验证备份",
+        "恢复私钥离线保管"
+      ]
+    },
+    {
+      "type": "log",
+      "x": 40,
+      "y": 1260,
+      "w": 1350,
+      "rows": 3,
+      "padTop": 20,
+      "padBottom": 24,
+      "padLeft": 22,
+      "title": "演示运行日志",
+      "titleX": 30,
+      "titleW": 205,
+      "cols": [
+        {
+          "key": "time",
+          "x": 0
+        },
+        {
+          "key": "who",
+          "x": 145
+        },
+        {
+          "key": "m",
+          "x": 285
+        },
+        {
+          "key": "g",
+          "x": 1250
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "x": 40,
+      "y": 1420,
+      "t": "仅作演示  |  数据包：{packets}  |  智能体：{tasks.status}  |  非实时监控",
+      "c": "cy",
+      "size": 18,
+      "align": "left"
+    }
+  ]
+}

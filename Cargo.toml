@@ -36,6 +36,7 @@ object_store = { version = "0.14", default-features = false, features = ["aws"] 
 pulldown-cmark = "0.13"
 qiniu-sdk = { version = "=0.2.4", default-features = false, features = ["objects", "upload", "download", "ureq"] }
 rand_core = { version = "0.6", features = ["getrandom"] }
+"rsa" = { version = "0.9", features = ["pem", "sha2"] }
 redis = { version = "1.0", features = ["tokio-comp"] }
 rig = { version = "=0.42.0", default-features = false, features = ["agent", "rustls"] }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "stream"] }

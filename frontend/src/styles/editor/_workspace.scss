@@ -174,7 +174,7 @@
 .prose-blog hr {
   margin: 2rem 0;
   border: 0;
-  border-top: 1px solid var(--page-line);
+  border-top: var(--border-hairline) solid var(--page-line);
 }
 .prose-blog code:not(pre code) {
   border-radius: 2px;
@@ -191,7 +191,7 @@
 }
 .prose-blog th,
 .prose-blog td {
-  border: 1px solid var(--page-line);
+  border: var(--border-hairline) solid var(--page-line);
   padding: 0.35rem 0.65rem;
   text-align: left;
 }
@@ -217,13 +217,13 @@
   justify-content: space-between;
   gap: 20px;
   min-height: 78px;
-  border-bottom: 1px solid var(--page-line);
+  border-bottom: var(--border-hairline) solid var(--page-line);
   padding: 12px 24px;
 }
 .editor-status {
   min-height: 27px;
   flex: none;
-  border-bottom: 1px solid var(--page-line);
+  border-bottom: var(--border-hairline) solid var(--page-line);
   padding: 4px 24px;
   color: var(--page-subtle);
   font-size: 0.75rem;
@@ -242,7 +242,7 @@
 .editor-preview-pane {
   position: relative;
   isolation: isolate;
-  border-left: 1px solid var(--page-line);
+  border-left: var(--border-hairline) solid var(--page-line);
   background: var(--page-bg);
 }
 .editor-pane-heading {
@@ -250,7 +250,7 @@
   top: 0;
   z-index: 1;
   height: 38px;
-  border-bottom: 1px solid var(--page-line);
+  border-bottom: var(--border-hairline) solid var(--page-line);
   background: var(--color-paper);
   padding: 10px 24px;
   color: var(--page-subtle);
@@ -264,7 +264,7 @@
   padding: 24px 28px 80px;
 }
 .editor-document {
-  border: 1px solid var(--page-line);
+  border: var(--border-hairline) solid var(--page-line);
   background: var(--page-bg);
 }
 .editor-document:focus-within {
@@ -286,7 +286,7 @@
 }
 .editor-view-switch {
   display: none;
-  border: 1px solid var(--page-line);
+  border: var(--border-hairline) solid var(--page-line);
   border-radius: 3px;
   padding: 2px;
 }
@@ -302,7 +302,7 @@
 }
 .editor-draft-notice {
   padding: 10px 16px;
-  border-bottom: 1px solid var(--page-line);
+  border-bottom: var(--border-hairline) solid var(--page-line);
   color: var(--page-warm);
   font-size: 12px;
 }

@@ -19,7 +19,7 @@ use uuid::Uuid;
 use crate::{
     domain::article::render::render_document,
     entity::{
-        article, article_category, article_revision, article_tag, comment, search_job,
+        article, article_category, article_revision, article_tag, comment, paid_column, search_job,
         status::{ArticleStatus, SearchAction, SearchJobStatus},
     },
 };
@@ -33,6 +33,8 @@ use super::auth::require_admin;
 pub struct AdminPageQuery {
     /// 从 1 开始的页码。
     pub page: Option<u64>,
+    /// 指定小册时仅返回该小册的篇章，包括未发布草稿。
+    pub column_public_id: Option<Uuid>,
 }
 
 /// 文章写入内容；发布状态由单独接口控制。
@@ -52,6 +54,18 @@ pub struct ArticleInput {
     pub summary: Option<String>,
     /// Markdown 文档（type=markdown, source=原文）；兼容已有 Tiptap JSON 文档。
     pub document: Value,
+    /// 省略时保留已有访问配置，避免旧客户端意外解除付费限制。
+    #[serde(default)]
+    pub access: Option<ArticleAccessInput>,
+}
+
+/// 作者只指定所属专栏和付费开关；试看比例由服务端固定。
+#[derive(Clone, Deserialize, Serialize, ToSchema)]
+pub struct ArticleAccessInput {
+    /// 不属于专栏时为空；付费篇章必须指定专栏。
+    pub column_public_id: Option<Uuid>,
+    /// 免费全文篇章为 false，试看 30% 的付费篇章为 true。
+    pub subscriber_only: bool,
 }
 
 /// 管理端文章响应；内部主键不对外输出。
@@ -77,6 +91,8 @@ pub struct AdminArticleResponse {
     pub notion_page_id: Option<Uuid>,
     /// Notion 页面上次同步的编辑时间。
     pub notion_last_edited_at: Option<DateTime<Utc>>,
+    /// 作者可编辑的访问配置。
+    pub access: ArticleAccessInput,
 }
 
 impl From<article::Model> for AdminArticleResponse {
@@ -96,6 +112,10 @@ impl From<article::Model> for AdminArticleResponse {
             updated_at: row.updated_at,
             notion_page_id: row.notion_page_id,
             notion_last_edited_at: row.notion_last_edited_at,
+            access: ArticleAccessInput {
+                column_public_id: row.paid_column_public_id,
+                subscriber_only: row.subscriber_only,
+            },
         }
     }
 }
@@ -146,6 +166,34 @@ fn validate(input: &ArticleInput) -> Result<String, &'static str> {
     render_document(&input.document).map_err(|_| "文章文档格式无效")
 }
 
+/// 校验分组与付费开关；试看由服务端正文生成，旧版手填试看字段不再参与授权。
+async fn validate_access(
+    state: &AppState,
+    access: &ArticleAccessInput,
+    html: &str,
+) -> Result<(Option<Value>, Option<String>), &'static str> {
+    if access.subscriber_only && access.column_public_id.is_none() {
+        return Err("付费篇章必须属于专栏");
+    }
+    if let Some(id) = access.column_public_id {
+        let exists = paid_column::Entity::find()
+            .filter(paid_column::Column::PublicId.eq(id))
+            .one(&state.db)
+            .await
+            .map_err(|_| "读取专栏失败")?;
+        if exists.is_none() {
+            return Err("专栏不存在");
+        }
+    }
+    if !access.subscriber_only {
+        return Ok((None, None));
+    }
+    Ok((
+        None,
+        Some(crate::domain::article::render::preview_html(html)),
+    ))
+}
+
 /// 管理员可读取草稿与已发布文章。
 #[utoipa::path(get, path = "/api/v1/admin/articles", params(AdminPageQuery), responses((status = 200, body = AdminArticlePage), (status = 401, body = ApiError)), tag = "admin")]
 pub async fn list(
@@ -165,9 +213,21 @@ pub async fn list(
         );
     }
     let result = async {
-        let total = article::Entity::find().count(&state.db).await?;
-        let rows = article::Entity::find()
-            .order_by_desc(article::Column::UpdatedAt)
+        let mut articles = article::Entity::find();
+        if let Some(column_id) = query.column_public_id {
+            articles = articles.filter(article::Column::PaidColumnPublicId.eq(column_id));
+        }
+        let total = articles.clone().count(&state.db).await?;
+        // 小册目录与公开页按发布时间排列；草稿排在后面，以创建时间稳定排序。
+        let ordered = if query.column_public_id.is_some() {
+            articles
+                .order_by_asc(article::Column::PublishedAt)
+                .order_by_asc(article::Column::CreatedAt)
+                .order_by_asc(article::Column::PublicId)
+        } else {
+            articles.order_by_desc(article::Column::UpdatedAt)
+        };
+        let rows = ordered
             .limit(20)
             .offset((page - 1) * 20)
             .all(&state.db)
@@ -207,6 +267,14 @@ pub async fn create(
         Ok(html) => html,
         Err(_) => return error(StatusCode::BAD_REQUEST, "invalid_article", "文章内容无效"),
     };
+    let access = input.access.clone().unwrap_or(ArticleAccessInput {
+        column_public_id: None,
+        subscriber_only: false,
+    });
+    let (preview_document, preview_html) = match validate_access(&state, &access, &html).await {
+        Ok(value) => value,
+        Err(message) => return error(StatusCode::BAD_REQUEST, "invalid_article_access", message),
+    };
     match article::Entity::find()
         .filter(article::Column::Slug.eq(&input.slug))
         .one(&state.db)
@@ -240,6 +308,10 @@ pub async fn create(
         notion_page_id: Set(None),
         notion_last_edited_at: Set(None),
         notion_synced_at: Set(None),
+        paid_column_public_id: Set(access.column_public_id),
+        subscriber_only: Set(access.subscriber_only),
+        preview_document: Set(preview_document),
+        preview_html: Set(preview_html),
     };
     match model.insert(&state.db).await {
         Ok(row) => (StatusCode::CREATED, Json(AdminArticleResponse::from(row))).into_response(),
@@ -297,6 +369,16 @@ pub async fn update(
         Ok(html) => html,
         Err(_) => return error(StatusCode::BAD_REQUEST, "invalid_article", "文章内容无效"),
     };
+    let access = if let Some(access) = &input.access {
+        match validate_access(&state, access, &html).await {
+            Ok((document, html)) => Some((access.clone(), document, html)),
+            Err(message) => {
+                return error(StatusCode::BAD_REQUEST, "invalid_article_access", message);
+            }
+        }
+    } else {
+        None
+    };
     let result = async {
         let txn = state.db.begin().await?;
         let Some(old) = article::Entity::find()
@@ -331,6 +413,12 @@ pub async fn update(
         active.summary = Set(input.summary);
         active.document = Set(input.document);
         active.rendered_html = Set(html);
+        if let Some((access, document, preview_html)) = access {
+            active.paid_column_public_id = Set(access.column_public_id);
+            active.subscriber_only = Set(access.subscriber_only);
+            active.preview_document = Set(document);
+            active.preview_html = Set(preview_html);
+        }
         active.updated_at = Set(now);
         let row = active.update(&txn).await?;
         if row.status == ArticleStatus::Published {
@@ -579,6 +667,7 @@ mod tests {
             title: "标题".into(),
             summary: None,
             document: json!({"type":"doc"}),
+            access: None,
         };
         assert!(validate(&input).is_err());
         input.slug = "hello".into();

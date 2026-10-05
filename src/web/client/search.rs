@@ -8,6 +8,7 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
+use sea_orm::sea_query::ExprTrait;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde::Deserialize;
 use utoipa::IntoParams;
@@ -75,9 +76,22 @@ pub async fn search_articles(
         })
         .into_response();
     }
+    // 即使旧索引仍有条目，数据库可见性也阻止下架小册泄漏到公开搜索。
+    let visible_columns = sea_orm::sea_query::Query::select()
+        .column(crate::entity::paid_column::Column::PublicId)
+        .from(crate::entity::paid_column::Entity)
+        .and_where(
+            sea_orm::sea_query::Expr::col(crate::entity::paid_column::Column::Visible).eq(true),
+        )
+        .to_owned();
     let rows = match article::Entity::find()
         .filter(article::Column::Id.is_in(ids.clone()))
         .filter(article::Column::Status.eq(ArticleStatus::Published))
+        .filter(
+            sea_orm::Condition::any()
+                .add(article::Column::PaidColumnPublicId.is_null())
+                .add(article::Column::PaidColumnPublicId.in_subquery(visible_columns)),
+        )
         .all(&state.db)
         .await
     {
@@ -101,7 +115,10 @@ pub async fn search_articles(
             slug: row.slug,
             title: row.title,
             summary: row.summary,
+            cover_url: None,
             published_at: row.published_at,
+            paid_column_public_id: row.paid_column_public_id,
+            subscriber_only: row.subscriber_only,
         })
         .collect();
     Json(ArticlePageResponse {

@@ -1,3 +1,8 @@
+.home-intro-container {
+  container-type: inline-size;
+  width: 100%;
+  min-width: 0;
+}
 .home-intro {
   display: flex;
   flex-direction: column-reverse;
@@ -7,6 +12,7 @@
 }
 .home-intro-copy {
   min-width: 0;
+  width: 100%;
   max-width: 20rem;
 }
 .home-intro-body {
@@ -14,17 +20,56 @@
   color: var(--page-body);
   font-size: 0.875rem;
   line-height: 1.75;
-  white-space: pre-line;
   overflow-wrap: anywhere;
+}
+.home-intro-body ul,
+.home-intro-body ol {
+  padding-left: 1.25rem;
+  margin-block: 0.75rem;
+}
+.home-intro-body ul {
+  list-style: disc;
+}
+.home-intro-body ol {
+  list-style: decimal;
+}
+/* 根据预览容器而非浏览器宽度布局，文字列可以收缩且始终位于肖像左侧。 */
+@container (min-width: 28rem) {
+  .home-intro {
+    flex-direction: row;
+    gap: clamp(1rem, 4cqi, 2.5rem);
+  }
+  .home-intro-copy {
+    flex: 1;
+  }
+  .home-intro .home-portrait-stage {
+    width: clamp(9rem, 28cqi, 15rem);
+  }
 }
 .home-intro-body p + p {
   margin-top: 0.75rem;
 }
 .home-intro-body .contact-preview-trigger {
-  border-bottom: 1px solid var(--page-line);
+  border-bottom: var(--border-hairline) solid var(--page-line);
   color: var(--page-text);
   transition: border-color 150ms ease;
 }
 .home-intro-body .contact-preview-trigger:hover {
   border-color: var(--page-text);
+}
+/* 参考首页的中心向两侧入场；路由重新挂载时重播，包含浏览器后退。 */
+@keyframes home-writing-swing {
+  from {
+    opacity: 0;
+    transform: translateY(12px) rotate(-2deg);
+    filter: blur(2px);
+  }
+}
+.home-writing-enter {
+  animation: home-writing-swing 400ms var(--ease-swift) backwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-writing-enter {
+    animation: none;
+  }
 }

@@ -13,18 +13,57 @@
 }
 
 :root {
-  --page-bg: #fbfaf7;
-  --page-paper: #f7f6f2;
+  /* 高密度屏幕使用单个物理像素的发丝线，与参考站保持相同线宽。 */
+  --border-hairline: 1px;
+  /* 与参考站的微暖灰色阶一致，避免大面积底色偏黄。 */
+  --page-bg: oklch(0.99 0.001 95);
+  --page-paper: oklch(0.975 0.0015 95);
+  /* 供普通 CSS 使用；@theme inline 不会生成运行时的 --color-paper 变量。 */
+  --color-paper: var(--page-paper);
   --page-text: #34312e;
   --page-body: #5d5954;
   --page-subtle: #77736e;
-  --page-line: #dcd9d3;
+  --page-line: oklch(0.91 0.0025 92);
+  /* 页面两侧导引线使用参考站的次要文字色，独立于内容分隔线。 */
+  --column-guide-ink: oklch(0.56 0.004 78);
+  --column-guide-opacity: 0.5;
   --page-accent: #34312e;
   --page-warm: #aa563d;
   --page-signal: #c96a40;
+  --page-selection-bg: #dce8ad;
+  --preferences-control-bg: oklch(0.95 0.002 95);
+  --preferences-panel-bg: color-mix(in oklab, var(--page-paper) 97%, transparent);
+  --dock-bg: color-mix(in oklab, var(--page-bg) 92%, transparent);
+  --ruler-major-ink: rgb(255 255 255 / 18%);
+  --ruler-minor-ink: rgb(255 255 255 / 12%);
+  --preferences-panel-shadow: 0 2px 5px rgb(52 49 46 / 8%), 0 12px 28px rgb(52 49 46 / 8%);
+  --portrait-ink: #34312e;
+  --project-ghost-ink: color-mix(in oklab, var(--page-text) 5%, transparent);
+  --project-grid-ink: color-mix(in oklab, var(--page-text) 3.5%, transparent);
+  --project-shader-opacity: 0.14;
+  /* 小册书架材质与封面配色：木板适配主题，书本保留各自印刷颜色。 */
+  --shelf-shadow-rgb: 27 22 17;
+  --shelf-front-bottom: oklch(0.61 0.065 64);
+  --shelf-front-top: oklch(0.79 0.05 74);
+  --shelf-grain: rgb(71 42 17 / 8%);
+  --shelf-top-back: oklch(0.77 0.045 75);
+  --shelf-top-front: oklch(0.84 0.04 78);
+  --book-color-0: #e8e6db;
+  --book-ink-0: #333630;
+  --book-color-1: #a73f40;
+  --book-ink-1: #fff4ed;
+  --book-color-2: #e9cb42;
+  --book-ink-2: #383620;
+  --book-color-3: #4b766b;
+  --book-ink-3: #f4f1e7;
+  --book-color-4: #a9c7d0;
+  --book-ink-4: #253940;
+  --book-color-5: #343837;
+  --book-ink-5: #f4efe5;
   --page-width: 600px;
   --page-content-width: 552px;
   --ease-swift: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --editor-chat-width: 400px;
   --editor-code-font: "Geist Mono", ui-monospace, monospace;
   --editor-assistant-radius: 18px;
@@ -35,13 +74,62 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --page-bg: #1d2020;
-  --page-paper: #252a29;
-  --page-text: #e8ebe5;
-  --page-body: #c3cbc5;
-  --page-subtle: #aab3ad;
-  --page-line: #414a45;
-  --page-accent: #d7e2d7;
+  /* 对齐 Cali .dark.public-site 的暖灰色阶，背景、纸面与文字使用同一色相体系。 */
+  --page-bg: oklch(0.16 0.006 80);
+  --page-paper: oklch(0.19 0.007 80);
+  --page-text: oklch(0.94 0.006 92);
+  --page-body: oklch(0.78 0.008 88);
+  --page-subtle: oklch(0.61 0.01 84);
+  --page-line: oklch(0.27 0.009 80);
+  --column-guide-ink: oklch(0.61 0.01 84);
+  --column-guide-opacity: 0.4;
+  --page-accent: var(--page-text);
   --page-warm: #e79f82;
-  --page-signal: #e5a765;
+  --page-signal: oklch(0.7 0.17 48);
+  --page-selection-bg: oklch(0.8 0.14 105 / 28%);
+  --preferences-control-bg: oklch(0.22 0.008 80);
+  --preferences-panel-bg: color-mix(in oklab, var(--page-paper) 97%, transparent);
+  --dock-bg: color-mix(in oklab, var(--page-paper) 92%, transparent);
+  --preferences-panel-shadow: 0 2px 5px rgb(0 0 0 / 20%), 0 12px 28px rgb(0 0 0 / 24%);
+  --portrait-ink: oklch(0.87 0.007 90);
+  --project-ghost-ink: color-mix(in oklab, var(--page-text) 6.5%, transparent);
+  --project-grid-ink: color-mix(in oklab, var(--page-text) 4.2%, transparent);
+  --project-shader-opacity: 0.12;
+  --shelf-shadow-rgb: 0 0 0;
+  --shelf-front-bottom: oklch(0.29 0.035 49);
+  --shelf-front-top: oklch(0.43 0.04 59);
+  --shelf-grain: rgb(0 0 0 / 15%);
+  --shelf-top-back: oklch(0.38 0.035 56);
+  --shelf-top-front: oklch(0.47 0.035 62);
+}
+
+@media (min-resolution: 192dpi) {
+  :root {
+    --border-hairline: 0.5px;
+  }
+}
+
+/* Tailwind 语义边框沿用同一发丝线 token，仅修改已经声明的边，不引入额外边框。 */
+@layer utilities {
+  .border-line.border {
+    border-width: var(--border-hairline);
+  }
+  .border-line.border-t {
+    border-top-width: var(--border-hairline);
+  }
+  .border-line.border-r {
+    border-right-width: var(--border-hairline);
+  }
+  .border-line.border-b {
+    border-bottom-width: var(--border-hairline);
+  }
+  .border-line.border-l {
+    border-left-width: var(--border-hairline);
+  }
+  .border-line.border-x {
+    border-inline-width: var(--border-hairline);
+  }
+  .border-line.border-y {
+    border-block-width: var(--border-hairline);
+  }
 }

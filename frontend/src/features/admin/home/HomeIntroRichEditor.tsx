@@ -1,7 +1,7 @@
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { Markdown } from "@tiptap/markdown";
-import { Bold, Italic, Link2, Link2Off } from "lucide-react";
+import { Bold, Italic, Link2, Link2Off, List, ListOrdered, Undo2, Redo2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { parseProfile } from "../../contact/profile";
 
@@ -21,7 +21,15 @@ export function HomeIntroRichEditor({
   const [linkError, setLinkError] = useState("");
   const editor = useEditor({
     immediatelyRender: false,
-    extensions: [StarterKit.configure({ link: { openOnClick: false, autolink: false } }), Markdown],
+    extensions: [
+      StarterKit.configure({
+        heading: false,
+        codeBlock: false,
+        horizontalRule: false,
+        link: { openOnClick: false, autolink: false },
+      }),
+      Markdown,
+    ],
     content: value,
     contentType: "markdown",
     onUpdate: ({ editor: instance }) => onChangeRef.current(instance.getMarkdown()),
@@ -107,6 +115,24 @@ export function HomeIntroRichEditor({
         <span className="home-intro-rich-toolbar-divider" />
         <button
           type="button"
+          aria-label="无序列表"
+          title="无序列表"
+          aria-pressed={editor?.isActive("bulletList") ?? false}
+          onClick={() => editor?.chain().focus().toggleBulletList().run()}
+        >
+          <List size={16} />
+        </button>
+        <button
+          type="button"
+          aria-label="有序列表"
+          title="有序列表"
+          aria-pressed={editor?.isActive("orderedList") ?? false}
+          onClick={() => editor?.chain().focus().toggleOrderedList().run()}
+        >
+          <ListOrdered size={16} />
+        </button>
+        <button
+          type="button"
           title="添加链接"
           aria-label="添加链接"
           aria-pressed={linkOpen}
@@ -122,6 +148,24 @@ export function HomeIntroRichEditor({
           onClick={() => editor?.chain().focus().unsetLink().run()}
         >
           <Link2Off size={16} />
+        </button>
+        <button
+          type="button"
+          aria-label="撤销"
+          title="撤销"
+          disabled={!editor?.can().undo()}
+          onClick={() => editor?.chain().focus().undo().run()}
+        >
+          <Undo2 size={16} />
+        </button>
+        <button
+          type="button"
+          aria-label="重做"
+          title="重做"
+          disabled={!editor?.can().redo()}
+          onClick={() => editor?.chain().focus().redo().run()}
+        >
+          <Redo2 size={16} />
         </button>
       </div>
       <EditorContent editor={editor} aria-label="介绍正文" />

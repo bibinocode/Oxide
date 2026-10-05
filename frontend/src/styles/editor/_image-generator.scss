@@ -1,0 +1,27 @@
+.image-generator-dialog {
+  width: min(520px, calc(100vw - 32px));
+  max-height: min(92vh, 740px);
+  margin: auto;
+  padding: 22px;
+  overflow: auto;
+  border: var(--border-hairline) solid var(--page-line);
+  border-radius: 8px;
+  background: var(--page-bg);
+  color: var(--page-text);
+  box-shadow: var(--preferences-panel-shadow);
+}
+.image-generator-dialog::backdrop {
+  background: rgb(0 0 0 / 55%);
+}
+.image-generator-preview {
+  margin-inline: 0;
+  padding: 8px;
+  border: var(--border-hairline) solid var(--page-line);
+  background: var(--page-paper);
+}
+.image-generator-preview img {
+  display: block;
+  width: 100%;
+  max-height: 360px;
+  object-fit: contain;
+}

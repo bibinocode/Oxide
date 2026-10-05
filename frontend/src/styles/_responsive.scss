@@ -1,7 +1,8 @@
 @media (max-width: 640px) {
   .reading-width,
   .public-width {
-    width: min(calc(100% - 32px), var(--page-width));
+    /* 与导引线错开，保持正文最大宽度和两侧安全留白。 */
+    width: min(calc(100% - 64px), var(--page-content-width));
   }
   .catalog-row-title {
     white-space: normal;
@@ -30,7 +31,7 @@
   .admin-sidebar {
     flex: none;
     border-right: 0;
-    border-bottom: 1px solid var(--page-line);
+    border-bottom: var(--border-hairline) solid var(--page-line);
     padding: 12px 16px;
   }
   .admin-sidebar-brand {

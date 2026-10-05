@@ -8,13 +8,14 @@ import { SiteModulesEditor } from "../features/admin/settings/SiteModulesEditor"
 import { TaxonomyEditor } from "../features/admin/settings/TaxonomyEditor";
 import { ProviderSection } from "../features/admin/settings/StorageSettings";
 import { HomeIntroductionEditor } from "../features/admin/home/HomeIntroductionEditor";
+import { AboutEditor } from "../features/admin/settings/AboutEditor";
 
 export const Route = createFileRoute("/admin/settings")({ component: SettingsPage });
 
 function SettingsPage() {
   const { session } = useAdminSession();
   const [section, setSection] = useState<
-    "site" | "intro" | "modules" | "taxonomy" | "storage" | "agent"
+    "site" | "intro" | "about" | "modules" | "taxonomy" | "storage" | "agent"
   >("site");
   const [site, setSite] = useState<SiteSettings>({
     site_name: "Oxide",
@@ -29,11 +30,14 @@ function SettingsPage() {
   useEffect(() => {
     Promise.all([
       apiRequest<SiteSettings>("/api/v1/site"),
-      apiRequest<Taxonomy[]>("/api/v1/categories"),
-      apiRequest<Taxonomy[]>("/api/v1/tags"),
+      apiRequest<Taxonomy[]>("/api/v1/admin/categories"),
+      apiRequest<Taxonomy[]>("/api/v1/admin/tags"),
     ])
       .then(([settings, categoryItems, tagItems]) => {
-        setSite({ ...settings, presentation: settings.presentation ?? emptyPresentation() });
+        setSite({
+          ...settings,
+          presentation: { ...emptyPresentation(), ...settings.presentation },
+        });
         setCategories(categoryItems);
         setTags(tagItems);
       })
@@ -58,7 +62,7 @@ function SettingsPage() {
   }
 
   async function create(kind: "categories" | "tags", item: Taxonomy) {
-    if (!session) return;
+    if (!session) return false;
     try {
       const created = await apiRequest<Taxonomy>(`/api/v1/admin/${kind}`, {
         method: "POST",
@@ -68,13 +72,16 @@ function SettingsPage() {
       if (kind === "categories") setCategories((previous) => [...previous, created]);
       else setTags((previous) => [...previous, created]);
       setMessage("已创建");
+      return true;
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "创建失败");
+      return false;
     }
   }
 
   async function remove(kind: "categories" | "tags", slug: string) {
-    if (!session || !window.confirm(`删除 ${slug}？`)) return;
+    if (!session || !window.confirm(`删除「${slug}」并移除其文章关联？文章正文会保留。`))
+      return false;
     try {
       await apiRequest(`/api/v1/admin/${kind}/${slug}`, {
         method: "DELETE",
@@ -83,8 +90,31 @@ function SettingsPage() {
       if (kind === "categories")
         setCategories((previous) => previous.filter((item) => item.slug !== slug));
       else setTags((previous) => previous.filter((item) => item.slug !== slug));
+      setMessage("条目及关联已删除，文章正文已保留");
+      return true;
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "删除失败");
+      return false;
+    }
+  }
+
+  async function visibility(kind: "categories" | "tags", item: Taxonomy) {
+    if (!session) return false;
+    try {
+      const value = await apiRequest<Taxonomy>(`/api/v1/admin/${kind}/${item.slug}`, {
+        method: "PATCH",
+        headers: csrfHeaders(session),
+        body: JSON.stringify({ visible: !item.visible }),
+      });
+      const update = (items: Taxonomy[]) =>
+        items.map((entry) => (entry.slug === item.slug ? value : entry));
+      if (kind === "categories") setCategories(update);
+      else setTags(update);
+      setMessage(value.visible ? "已恢复公开展示" : "已隐藏，文章关联仍保留");
+      return true;
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : "状态修改失败");
+      return false;
     }
   }
 
@@ -95,6 +125,7 @@ function SettingsPage() {
           [
             ["site", "站点信息"],
             ["intro", "首页介绍"],
+            ["about", "关于我"],
             ["modules", "页面模块"],
             ["taxonomy", "分类与标签"],
             ["storage", "素材存储"],
@@ -188,6 +219,26 @@ function SettingsPage() {
           </p>
         </div>
       )}
+      {section === "about" && (
+        <div>
+          <p className="eyebrow">About</p>
+          <h2 className="mt-2 text-base font-semibold">关于我</h2>
+          <form onSubmit={saveSite} className="mt-7 space-y-5">
+            <AboutEditor
+              value={site.presentation.about_body ?? ""}
+              onChange={(about_body) =>
+                setSite({ ...site, presentation: { ...site.presentation, about_body } })
+              }
+            />
+            <button type="submit" className="button-primary">
+              保存关于我
+            </button>
+          </form>
+          <p role="status" className="mt-4 text-sm text-muted">
+            {message}
+          </p>
+        </div>
+      )}
       {section === "taxonomy" && (
         <div className="grid max-w-5xl gap-10 lg:grid-cols-2">
           <TaxonomyEditor
@@ -196,6 +247,7 @@ function SettingsPage() {
             items={categories}
             onCreate={create}
             onRemove={remove}
+            onVisibility={visibility}
           />
           <TaxonomyEditor
             title="标签"
@@ -203,6 +255,7 @@ function SettingsPage() {
             items={tags}
             onCreate={create}
             onRemove={remove}
+            onVisibility={visibility}
           />
         </div>
       )}

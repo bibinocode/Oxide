@@ -4,4 +4,34 @@ target
 **/target
 frontend/node_modules
 frontend/.output
-docs
+docs/*
+!docs/third-party-notices.md
+
+.env.*
+data
+.agents
+.codex
+frontend/.tanstack
+frontend/dist
+.playwright-mcp
+
+# 独立容器运行凭据，不进入版本控制或镜像上下文。
+**/app.env
+**/backup.env
+
+# 构建上下文同样排除恢复材料、数据库快照与临时凭据。
+*.dump
+*.sql
+*.sqlite*
+*.db
+*.age
+**/age-key.txt
+**/*.pem
+**/*.key
+**/*.log
+**/*.bak
+**/*.backup
+**/*.tar
+**/*.tar.gz
+**/*.tgz
+**/*.zip

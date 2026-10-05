@@ -1,49 +1,81 @@
-import { Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { Taxonomy } from "../../../lib/api/types";
 
+/** 标签与分类的隐藏可恢复；删除只移除关联，不删除文章。 */
 export function TaxonomyEditor({
   title,
   kind,
   items,
   onCreate,
   onRemove,
+  onVisibility,
 }: {
   title: string;
   kind: "categories" | "tags";
   items: Taxonomy[];
-  onCreate: (kind: "categories" | "tags", item: Taxonomy) => Promise<void>;
-  onRemove: (kind: "categories" | "tags", slug: string) => Promise<void>;
+  onCreate: (kind: "categories" | "tags", item: Taxonomy) => Promise<boolean>;
+  onRemove: (kind: "categories" | "tags", slug: string) => Promise<boolean>;
+  onVisibility: (kind: "categories" | "tags", item: Taxonomy) => Promise<boolean>;
 }) {
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
+  const [pending, setPending] = useState(false);
+  const lock = useRef(false);
+  async function run(action: () => Promise<boolean>) {
+    if (lock.current) return;
+    lock.current = true;
+    setPending(true);
+    try {
+      return await action();
+    } finally {
+      lock.current = false;
+      setPending(false);
+    }
+  }
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    await onCreate(kind, { name, slug });
-    setName("");
-    setSlug("");
+    if (await run(() => onCreate(kind, { name, slug, visible: true }))) {
+      setName("");
+      setSlug("");
+    }
   }
   return (
     <div>
       <h2 className="text-base font-semibold">{title}</h2>
+      <p className="mt-2 text-xs leading-6 text-muted">
+        隐藏可恢复；删除只移除文章关联，文章会保留。
+      </p>
       <div className="mt-5 border-t border-line">
         {items.map((item) => (
           <div
             key={item.slug}
-            className="flex items-center justify-between border-b border-line py-3 text-sm"
+            className="flex flex-wrap items-center justify-between gap-3 border-b border-line py-3 text-sm"
           >
             <span>
-              {item.name} <span className="ml-2 text-muted">/{item.slug}</span>
+              {item.name}{" "}
+              <span className="ml-2 text-muted">
+                /{item.slug} · {item.visible ? "公开" : "已隐藏"}
+              </span>
             </span>
-            <button
-              type="button"
-              onClick={() => onRemove(kind, item.slug)}
-              title={`删除${item.name}`}
-              aria-label={`删除${item.name}`}
-              className="text-muted hover:text-warm"
-            >
-              <Trash2 size={16} />
-            </button>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => void run(() => onVisibility(kind, item))}
+                className="button-secondary"
+              >
+                {item.visible ? "隐藏" : "恢复展示"}
+              </button>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => void run(() => onRemove(kind, item.slug))}
+                className="button-secondary text-warm"
+                aria-label={`删除${item.name}`}
+              >
+                删除
+              </button>
+            </div>
           </div>
         ))}
       </div>
@@ -53,6 +85,7 @@ export function TaxonomyEditor({
           placeholder="名称"
           aria-label={`${title}名称`}
           required
+          disabled={pending}
           value={name}
           onChange={(event) => setName(event.target.value)}
         />
@@ -61,16 +94,12 @@ export function TaxonomyEditor({
           placeholder="slug"
           aria-label={`${title} slug`}
           required
+          disabled={pending}
           value={slug}
           onChange={(event) => setSlug(event.target.value.toLowerCase())}
         />
-        <button
-          type="submit"
-          className="button-secondary"
-          title={`添加${title}`}
-          aria-label={`添加${title}`}
-        >
-          <Plus size={18} />
+        <button type="submit" disabled={pending} className="button-secondary">
+          {pending ? "处理中…" : `添加${title}`}
         </button>
       </form>
     </div>

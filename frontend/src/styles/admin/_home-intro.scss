@@ -4,6 +4,7 @@
   align-items: start;
 }
 .home-intro-editor-fields {
+  min-width: 0;
   display: grid;
   gap: 1.25rem;
   max-width: 40rem;
@@ -13,14 +14,15 @@
   gap: 1rem;
 }
 .home-intro-rich-editor {
-  border: 1px solid var(--page-line);
+  min-width: 0;
+  border: var(--border-hairline) solid var(--page-line);
   background: var(--page-bg);
 }
 .home-intro-rich-toolbar {
   display: flex;
   align-items: center;
   gap: 3px;
-  border-bottom: 1px solid var(--page-line);
+  border-bottom: var(--border-hairline) solid var(--page-line);
   padding: 5px;
 }
 .home-intro-rich-toolbar button {
@@ -42,12 +44,13 @@
 .home-intro-rich-toolbar-divider {
   height: 20px;
   margin-inline: 5px;
-  border-left: 1px solid var(--page-line);
+  border-left: var(--border-hairline) solid var(--page-line);
 }
 .home-intro-rich-editor .tiptap {
   min-height: 220px;
   max-height: 45vh;
   overflow-y: auto;
+  overflow-wrap: anywhere;
   padding: 16px;
   color: var(--page-body);
   font-size: 14px;
@@ -66,22 +69,13 @@
 .home-intro-link-form {
   display: grid;
   gap: 9px;
-  border-top: 1px solid var(--page-line);
+  border-top: var(--border-hairline) solid var(--page-line);
   padding: 12px;
 }
 .home-intro-editor-preview {
   min-width: 0;
-  border-top: 1px solid var(--page-line);
+  border-top: var(--border-hairline) solid var(--page-line);
   padding-top: 1.25rem;
-}
-@media (min-width: 640px) {
-  .home-intro {
-    flex-direction: row;
-    align-items: flex-start;
-  }
-  .home-portrait-stage {
-    width: 15rem;
-  }
 }
 @media (min-width: 1180px) {
   .home-intro-editor {
@@ -91,13 +85,21 @@
     position: sticky;
     top: 2rem;
     border-top: 0;
-    border-left: 1px solid var(--page-line);
+    border-left: var(--border-hairline) solid var(--page-line);
     padding: 1rem 1.5rem;
     max-width: 43rem;
   }
-  .home-intro-editor-preview .home-portrait-stage {
-    width: clamp(9rem, 16vw, 12rem);
-  }
+}
+.home-intro-rich-editor .tiptap ul {
+  list-style: disc;
+  padding-left: 1.25rem;
+}
+.home-intro-rich-editor .tiptap ol {
+  list-style: decimal;
+  padding-left: 1.25rem;
+}
+.home-intro-editor-preview .prose-blog {
+  overflow-wrap: anywhere;
 }
 @media (prefers-reduced-motion: reduce) {
   .home-portrait-field {

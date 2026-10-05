@@ -36,6 +36,10 @@ pub async fn text_provider(
             .await?;
         return Ok(provider.filter(eligible_text_provider));
     }
+    // 评论审核必须显式开启，禁止关闭绑定后回退到其他写作模型。
+    if task == AgentTask::CommentReview {
+        return Ok(None);
+    }
     let mut providers = agent_provider::Entity::find()
         .filter(agent_provider::Column::Enabled.eq(true))
         .filter(agent_provider::Column::Capability.eq("text"))

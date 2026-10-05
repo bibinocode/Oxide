@@ -1,5 +1,6 @@
 //! Agent 模型注册、任务绑定与生成接口。
 
+pub mod image;
 pub mod skills;
 pub mod summary;
 pub mod tools;
@@ -361,6 +362,24 @@ pub async fn bind_task(
             "任务类型无效",
         );
     };
+    // 空绑定恢复人工审核或任务默认值，支持后台关闭自动评论审核。
+    if input.provider_id.is_empty() {
+        return match agent_binding::Entity::delete_by_id(&task)
+            .exec(&state.db)
+            .await
+        {
+            Ok(_) => Json(BindingResponse {
+                task,
+                provider_id: String::new(),
+            })
+            .into_response(),
+            Err(_) => error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "internal_error",
+                "解除模型绑定失败",
+            ),
+        };
+    }
     let provider = match agent_provider::Entity::find_by_id(&input.provider_id)
         .one(&state.db)
         .await

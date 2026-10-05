@@ -2,17 +2,17 @@
 
 use axum::{
     Json,
-    extract::{Multipart, Path, State},
+    extract::{Multipart, Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
 };
 use chrono::{DateTime, Utc};
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder,
-    QuerySelect, Set, TransactionTrait,
+    ActiveModelTrait, ColumnTrait, Condition, EntityTrait, IntoActiveModel, QueryFilter,
+    QueryOrder, QuerySelect, Set, TransactionTrait,
 };
 use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
+use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
 use crate::{
@@ -85,6 +85,10 @@ pub struct AssetResponse {
     pub public_id: Uuid,
     /// 稳定媒体地址。
     pub media_url: String,
+    /// 实际存储提供商标识，供管理员整理和迁移素材。
+    pub provider_id: String,
+    /// 实际对象路径；旧记录保留原路径，不按新规则推算。
+    pub object_key: String,
     /// MIME 类型。
     pub mime_type: String,
     /// 字节大小。
@@ -575,6 +579,8 @@ fn asset_response(row: asset::Model) -> AssetResponse {
     AssetResponse {
         public_id: row.public_id,
         media_url: format!("/media/{}", row.public_id),
+        provider_id: row.provider_id,
+        object_key: row.object_key,
         mime_type: row.mime_type,
         size_bytes: row.size_bytes,
         width: row.width,
@@ -588,14 +594,60 @@ fn asset_response(row: asset::Model) -> AssetResponse {
     }
 }
 
-/// 管理员素材库默认展示最近 100 项。
-#[utoipa::path(get, path = "/api/v1/admin/assets", responses((status = 200, body = Vec<AssetResponse>), (status = 401, body = ApiError)), tag = "admin")]
-pub async fn assets(State(state): State<AppState>, headers: HeaderMap) -> Response {
+/// 使用上一批末条素材的公开 UUID 作为游标，避免上传新图片导致偏移分页重复或遗漏。
+#[derive(Deserialize, IntoParams)]
+pub struct AssetsQuery {
+    /// 为空时读取最新一批，每批最多 100 项。
+    pub before: Option<Uuid>,
+}
+
+/// 管理员素材库按上传时间倒序分页，旧的无参数调用仍返回最近 100 项。
+#[utoipa::path(get, path = "/api/v1/admin/assets", params(AssetsQuery), responses((status = 200, body = Vec<AssetResponse>), (status = 400, body = ApiError), (status = 401, body = ApiError)), tag = "admin")]
+pub async fn assets(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Query(query): Query<AssetsQuery>,
+) -> Response {
     if let Err(response) = require_admin(&state, &headers, false).await {
         return response;
     }
-    match asset::Entity::find()
+    let mut selection = asset::Entity::find();
+    if let Some(before) = query.before {
+        let cursor = match asset::Entity::find()
+            .filter(asset::Column::PublicId.eq(before))
+            .one(&state.db)
+            .await
+        {
+            Ok(Some(row)) => row,
+            Ok(None) => {
+                return error(
+                    StatusCode::BAD_REQUEST,
+                    "invalid_cursor",
+                    "分页位置已失效，请刷新素材库",
+                );
+            }
+            Err(err) => {
+                tracing::error!(error = %err, "读取素材分页位置失败");
+                return error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "internal_error",
+                    "服务暂时不可用",
+                );
+            }
+        };
+        selection = selection.filter(
+            Condition::any()
+                .add(asset::Column::CreatedAt.lt(cursor.created_at))
+                .add(
+                    Condition::all()
+                        .add(asset::Column::CreatedAt.eq(cursor.created_at))
+                        .add(asset::Column::Id.lt(cursor.id)),
+                ),
+        );
+    }
+    match selection
         .order_by_desc(asset::Column::CreatedAt)
+        .order_by_desc(asset::Column::Id)
         .limit(100)
         .all(&state.db)
         .await
@@ -688,7 +740,8 @@ pub async fn upload(
     };
     tracing::debug!("图片格式与尺寸校验完成");
     let public_id = Uuid::new_v4();
-    let key = format!("assets/{public_id}.{extension}");
+    let created_at = Utc::now();
+    let key = crate::domain::asset::image_object_key(public_id, created_at, extension);
     if let Err(err) = storage::configured(&provider, &state.comment_hash_key) {
         tracing::error!(error = %err, "初始化存储失败");
         return error(
@@ -730,7 +783,7 @@ pub async fn upload(
         width: Set(Some(dimensions.width as i32)),
         height: Set(Some(dimensions.height as i32)),
         visibility: Set(AssetVisibility::Private),
-        created_at: Set(Utc::now()),
+        created_at: Set(created_at),
         ..Default::default()
     };
     match model.insert(&state.db).await {

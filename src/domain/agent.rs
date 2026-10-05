@@ -7,6 +7,8 @@ pub enum AgentTask {
     Summary,
     Image,
     Chat,
+    /// 无工具权限的评论自动审核任务。
+    CommentReview,
 }
 
 impl AgentTask {
@@ -17,6 +19,7 @@ impl AgentTask {
             Self::Summary => "summary",
             Self::Image => "image",
             Self::Chat => "chat",
+            Self::CommentReview => "comment_review",
         }
     }
 
@@ -27,6 +30,7 @@ impl AgentTask {
             "summary" => Some(Self::Summary),
             "image" => Some(Self::Image),
             "chat" => Some(Self::Chat),
+            "comment_review" => Some(Self::CommentReview),
             _ => None,
         }
     }

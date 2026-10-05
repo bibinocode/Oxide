@@ -11,7 +11,7 @@
 }
 .agent-label {
   flex-shrink: 0;
-  border: 1px solid var(--page-line);
+  border: var(--border-hairline) solid var(--page-line);
   border-radius: 3px;
   padding: 6px 10px;
   color: var(--page-subtle);
@@ -22,7 +22,7 @@
   flex-wrap: wrap;
   gap: 8px;
   margin: 28px 0;
-  border-bottom: 1px solid var(--page-line);
+  border-bottom: var(--border-hairline) solid var(--page-line);
   padding-bottom: 20px;
 }
 .agent-skill-intro {
@@ -37,7 +37,7 @@
 .agent-skill-library,
 .agent-skill-editor {
   min-width: 0;
-  border: 1px solid var(--page-line);
+  border: var(--border-hairline) solid var(--page-line);
   border-radius: 5px;
   background: var(--page-bg);
   padding: 24px;
@@ -50,7 +50,7 @@
   align-items: center;
   gap: 8px;
   margin: 20px 0 10px;
-  border: 1px solid var(--page-line);
+  border: var(--border-hairline) solid var(--page-line);
   border-radius: 3px;
   padding: 10px;
   color: var(--page-subtle);
@@ -72,7 +72,7 @@
   margin-top: 18px;
 }
 .agent-skill-list li {
-  border: 1px solid var(--page-line);
+  border: var(--border-hairline) solid var(--page-line);
   border-radius: 3px;
   padding: 14px;
 }
@@ -97,7 +97,7 @@
 }
 .agent-skill-switch {
   margin-top: 12px;
-  border: 1px solid var(--page-line);
+  border: var(--border-hairline) solid var(--page-line);
   border-radius: 20px;
   padding: 3px 10px;
   font-size: 12px;
@@ -135,7 +135,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  border-top: 1px solid var(--page-line);
+  border-top: var(--border-hairline) solid var(--page-line);
   padding-top: 20px;
 }
 .agent-editor-actions button:last-child:not(:first-child) {
@@ -149,7 +149,7 @@
   background: var(--page-paper);
 }
 .agent-empty {
-  border: 1px dashed var(--page-line);
+  border: var(--border-hairline) dashed var(--page-line);
   border-radius: 5px;
   padding: 64px 24px;
   text-align: center;
@@ -158,7 +158,7 @@
   display: grid;
   justify-items: start;
   gap: 12px;
-  border: 1px dashed var(--page-line);
+  border: var(--border-hairline) dashed var(--page-line);
   border-radius: 4px;
   padding: 24px;
 }
@@ -181,13 +181,13 @@
   display: grid;
   grid-template-columns: minmax(150px, 210px) minmax(0, 1fr);
   gap: 20px;
-  border-top: 1px solid var(--page-line);
+  border-top: var(--border-hairline) solid var(--page-line);
   padding-top: 24px;
 }
 .agent-package-files nav {
   max-height: 600px;
   overflow: auto;
-  border-right: 1px solid var(--page-line);
+  border-right: var(--border-hairline) solid var(--page-line);
   padding-right: 12px;
 }
 .agent-package-files nav button {
@@ -224,7 +224,7 @@
   overflow: auto;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  border: 1px solid var(--page-line);
+  border: var(--border-hairline) solid var(--page-line);
   padding: 18px;
   font-family: var(--font-mono, monospace);
   font-size: 13px;
@@ -237,7 +237,7 @@
   .agent-package-files nav {
     max-height: 220px;
     border-right: none;
-    border-bottom: 1px solid var(--page-line);
+    border-bottom: var(--border-hairline) solid var(--page-line);
     padding: 0 0 12px;
   }
   .agent-skills-grid {
@@ -282,7 +282,7 @@
 .agent-tool-fields select {
   width: 100%;
   min-width: 0;
-  border: 1px solid var(--page-line);
+  border: var(--border-hairline) solid var(--page-line);
   border-radius: 3px;
   padding: 10px 12px;
   background: var(--page-bg);
@@ -303,7 +303,7 @@
   margin-top: 16px;
 }
 .agent-search-results li {
-  border: 1px solid var(--page-line);
+  border: var(--border-hairline) solid var(--page-line);
   border-radius: 3px;
   padding: 16px;
   overflow-wrap: anywhere;

@@ -1,0 +1,169 @@
+/* 固定导航的偏好入口与上浮面板，浅深色共用语义变量。 */
+.site-dock-divider {
+  width: 1px;
+  height: 18px;
+  margin-inline: 5px;
+  background: var(--page-line);
+}
+.site-preferences {
+  position: relative;
+}
+.preferences-trigger {
+  position: relative;
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+/* 导航名称与快捷键提示共用样式，避免浏览器原生 title 的延迟。 */
+.site-dock > a {
+  position: relative;
+}
+.dock-tooltip {
+  position: absolute;
+  z-index: 1;
+  bottom: calc(100% + 14px);
+  left: 50%;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transform: translateX(-50%) translateY(3px) scale(0.95);
+  border: var(--border-hairline) solid var(--page-line);
+  border-radius: 7px;
+  padding: 5px 6px 5px 9px;
+  background: var(--preferences-panel-bg);
+  box-shadow: var(--preferences-panel-shadow);
+  color: var(--page-text);
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 150ms var(--ease-swift),
+    transform 150ms var(--ease-swift);
+}
+.dock-tooltip-keys {
+  display: inline-flex;
+  gap: 3px;
+}
+.dock-tooltip kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 22px;
+  padding-inline: 4px;
+  border: var(--border-hairline) solid var(--page-line);
+  border-radius: 5px;
+  background: var(--preferences-control-bg);
+  color: var(--page-subtle);
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1;
+}
+.site-dock > a:focus-visible .dock-tooltip,
+.preferences-trigger:focus-visible[aria-expanded="false"] .dock-tooltip {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0) scale(1);
+}
+@media (hover: hover) and (pointer: fine) {
+  .site-dock > a:hover .dock-tooltip,
+  .preferences-trigger:hover[aria-expanded="false"] .dock-tooltip {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+/* 首项提示贴齐导航左边，窄屏键盘聚焦时也不越界。 */
+.site-dock > a:first-child .dock-tooltip {
+  left: 0;
+  transform-origin: left bottom;
+  translate: 50% 0;
+}
+.preferences-panel {
+  position: fixed;
+  inset: auto;
+  right: max(12px, calc(50% - 143px));
+  bottom: calc(max(18px, env(safe-area-inset-bottom)) + 66px);
+  width: min(264px, calc(100vw - 24px));
+  margin: 0;
+  padding: 16px;
+  overflow: visible;
+  border: var(--border-hairline) solid var(--page-line);
+  border-radius: 20px;
+  background: var(--preferences-panel-bg);
+  color: var(--page-text);
+  box-shadow: var(--preferences-panel-shadow);
+  backdrop-filter: blur(16px);
+}
+.preferences-panel:popover-open {
+  animation: preferences-enter 150ms var(--ease-swift);
+}
+.preferences-row + .preferences-row {
+  margin-top: 6px;
+}
+.preferences-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+.preferences-row-label {
+  color: var(--page-subtle);
+  font-size: 15px;
+}
+.theme-control-preferences {
+  gap: 2px;
+  margin: 0;
+  padding: 4px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--preferences-control-bg);
+}
+.theme-control-preferences button {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  transition:
+    background 150ms ease,
+    color 150ms ease;
+}
+.theme-control-preferences button:hover {
+  color: var(--page-text);
+}
+.theme-control-preferences button[aria-pressed="true"] {
+  background: var(--page-text);
+  color: var(--page-bg);
+}
+@keyframes preferences-enter {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (max-width: 380px) {
+  .site-dock > a,
+  .site-dock .preferences-trigger {
+    width: 36px;
+  }
+  .site-dock-divider {
+    margin-inline: 3px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .preferences-panel:popover-open {
+    animation: none;
+  }
+  .dock-tooltip,
+  .theme-control-preferences button {
+    transition: none;
+  }
+}
+
+/* 可选项目入口启用后，偏好面板仍与导航右缘对齐。 */
+.site-dock[data-projects-enabled="true"] .preferences-panel {
+  right: max(12px, calc(50% - 165px));
+}

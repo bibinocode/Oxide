@@ -68,8 +68,15 @@ async fn main() -> Result<()> {
         public_base_url: Arc::from(config.public_base_url),
         search: search.clone(),
         notion_api_key: config.notion_api_key.map(Arc::from),
+        wechat_pay: config.wechat_pay.map(Arc::new),
     };
 
+    // 数据库中的待审记录就是持久化队列；重启后继续审核，不依赖请求内临时任务。
+    tokio::spawn(rust_oxide::infrastructure::comment_moderation::run_worker(
+        state.db.clone(),
+        state.redis.clone(),
+        state.comment_hash_key.clone(),
+    ));
     let listener = tokio::net::TcpListener::bind(config.bind)
         .await
         .context("绑定 HTTP 地址失败")?;

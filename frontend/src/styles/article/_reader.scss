@@ -22,17 +22,96 @@
   margin: 0 0 40px;
   padding: 2% 2% 0;
   background: var(--color-paper);
-  border: 1px solid var(--page-line);
+  border: var(--border-hairline) solid var(--page-line);
   box-shadow: 0 2px 4px -1px rgb(0 0 0 / 14%);
 }
 .article-cover-photo {
+  position: relative;
   aspect-ratio: 16 / 9;
   overflow: hidden;
+  background: var(--page-paper);
+  view-transition-class: article-cover-morph;
 }
 .article-cover-photo img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+/* 相片显影沿用参考站的柔焦、轻微缩放节奏，加载完成才启动。 */
+@keyframes article-photo-develop {
+  from {
+    opacity: 0;
+    filter: blur(4px);
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: scale(1);
+  }
+}
+.article-cover-image.is-developed {
+  animation: article-photo-develop 350ms var(--ease-swift) both;
+}
+.article-cover-unavailable {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 0.75rem;
+  color: var(--page-subtle);
+}
+.article-title-card h1 {
+  view-transition-class: article-title-morph;
+}
+@keyframes article-enter-develop {
+  from {
+    opacity: 0;
+    filter: blur(4px);
+  }
+}
+.article-route-enter .article-spec-plate {
+  animation: article-enter-develop 250ms var(--ease-swift) 320ms backwards;
+}
+.article-route-enter > .article-summary,
+.article-route-enter > .article-prose {
+  animation: article-enter-develop 350ms var(--ease-swift) 520ms backwards;
+}
+/* 仅文章导航抑制浏览器默认全页交叉淡入；共享照片和标题保留连续变形。 */
+html:active-view-transition-type(article)::view-transition-group(root) {
+  animation: none;
+}
+html:active-view-transition-type(article)::view-transition-old(root) {
+  animation: article-route-defocus 250ms var(--ease-swift) both;
+}
+html:active-view-transition-type(article)::view-transition-new(root) {
+  animation: article-enter-develop 300ms var(--ease-swift) both;
+}
+@keyframes article-route-defocus {
+  to {
+    opacity: 0;
+    filter: blur(2px);
+  }
+}
+::view-transition-group(.article-cover-morph),
+::view-transition-group(.article-title-morph) {
+  animation-duration: 320ms;
+  animation-timing-function: var(--ease-swift);
+}
+@media (prefers-reduced-motion: reduce) {
+  .article-cover-image.is-developed,
+  .article-route-enter .article-spec-plate,
+  .article-route-enter > .article-summary,
+  .article-route-enter > .article-prose {
+    animation: none;
+  }
+  ::view-transition-group(.article-cover-morph),
+  ::view-transition-group(.article-title-morph),
+  html:active-view-transition-type(article)::view-transition-group(root),
+  html:active-view-transition-type(article)::view-transition-old(root),
+  html:active-view-transition-type(article)::view-transition-new(root) {
+    animation-duration: 0s !important;
+  }
 }
 .article-cover figcaption {
   height: 28px;
@@ -111,7 +190,7 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
   margin: 24px 0 0;
-  border-block: 1px solid var(--page-line);
+  border-block: var(--border-hairline) solid var(--page-line);
   padding-block: 12px;
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
@@ -176,7 +255,7 @@
   display: inline-block;
   margin-right: 10px;
   padding: 3px 19px 3px 6px;
-  border: 1px solid var(--page-line);
+  border: var(--border-hairline) solid var(--page-line);
   background: repeating-linear-gradient(-45deg, var(--page-subtle) 0 1px, transparent 1px 3.5px)
     right center / 12px 100% no-repeat;
   color: var(--page-subtle);
@@ -226,7 +305,7 @@
   width: min(260px, calc(100vw - 24px));
   pointer-events: none;
   overflow: hidden;
-  border: 1px solid var(--page-line);
+  border: var(--border-hairline) solid var(--page-line);
   background: var(--color-paper);
   box-shadow: 0 8px 24px rgb(0 0 0 / 16%);
   font-size: 12px;
@@ -258,6 +337,62 @@
   display: block;
   padding: 0 12px 12px;
   color: var(--page-subtle);
+}
+.article-preview-locked .article-prose {
+  position: relative;
+  display: flow-root;
+  min-height: 80px;
+}
+.article-preview-locked .article-prose > :last-child {
+  margin-bottom: 0;
+}
+/* 只覆盖服务端已经裁剪的试看末尾，使用页面底色以适配明暗主题。 */
+.article-preview-locked .article-prose::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 -1px;
+  height: min(112px, 75%);
+  background: linear-gradient(to bottom, transparent, var(--page-bg) 92%);
+  pointer-events: none;
+}
+.article-paywall {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  border-bottom: var(--border-hairline) solid var(--page-line);
+  padding: 20px 0 40px;
+  text-align: center;
+  color: var(--page-text);
+}
+.article-paywall-heading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  max-width: 100%;
+}
+.article-paywall-heading > svg {
+  flex: none;
+  color: var(--page-subtle);
+}
+.article-paywall h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.article-paywall p {
+  margin: 0;
+  color: var(--page-subtle);
+  font-size: 0.8125rem;
+  line-height: 1.7;
+  text-wrap: balance;
+}
+.article-paywall .button-primary {
+  margin-top: 6px;
+  max-width: 100%;
+  min-height: 40px;
 }
 @media (hover: none) {
   .article-link-card {
@@ -292,22 +427,22 @@
   position: absolute;
   inset: 4px auto 4px 0;
   width: 6px;
-  border: 1px solid var(--page-line);
+  border: var(--border-hairline) solid var(--page-line);
   background: repeating-linear-gradient(-45deg, var(--page-subtle) 0 1px, transparent 1px 3.5px);
 }
 .article-reader .article-prose img {
   border-radius: 0;
-  border: 1px solid var(--page-line);
+  border: var(--border-hairline) solid var(--page-line);
 }
 .article-reader .article-prose code:not(pre code) {
   background: var(--color-paper);
-  border: 1px solid var(--page-line);
+  border: var(--border-hairline) solid var(--page-line);
   padding: 1px 4px;
   font-size: var(--article-code-size);
 }
 .article-reader .article-prose pre {
   margin: 1.5em 0;
-  border: 1px solid var(--page-line);
+  border: var(--border-hairline) solid var(--page-line);
   border-radius: 0;
   padding: 18px;
   background: var(--color-paper) !important;
@@ -316,7 +451,7 @@
 }
 .article-code-frame {
   margin: 1.5em 0;
-  border: 1px solid var(--page-line);
+  border: var(--border-hairline) solid var(--page-line);
   background: var(--color-paper);
 }
 .article-code-frame figcaption {
@@ -324,7 +459,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 7px 12px;
-  border-bottom: 1px solid var(--page-line);
+  border-bottom: var(--border-hairline) solid var(--page-line);
   color: var(--page-subtle);
   font: 11px/1.5 var(--font-mono);
 }
@@ -470,7 +605,7 @@
     left: auto;
     width: 38px;
     height: 38px;
-    border: 1px solid var(--page-line);
+    border: var(--border-hairline) solid var(--page-line);
     background: var(--page-bg);
   }
   .article-outline-progress {
@@ -482,7 +617,7 @@
     left: auto;
     width: min(300px, calc(100vw - 32px));
     max-height: calc(100dvh - 120px);
-    border: 1px solid var(--page-line);
+    border: var(--border-hairline) solid var(--page-line);
     padding: 8px 14px;
     background: var(--page-bg);
     box-shadow: 0 8px 24px rgb(52 49 46 / 10%);

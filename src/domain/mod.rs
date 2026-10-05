@@ -4,5 +4,8 @@ pub mod agent;
 pub mod agent_skill;
 pub mod agent_tool;
 pub mod article;
+pub mod asset;
 pub mod notion;
 pub mod site;
+
+pub mod backup;

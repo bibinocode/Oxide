@@ -3,14 +3,15 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import CodeMirror from "@uiw/react-codemirror";
 import { markdown } from "@codemirror/lang-markdown";
 import { EditorView } from "@codemirror/view";
-import { ArrowLeft, History, Save, Trash2, PanelRight, Sparkles } from "lucide-react";
+import { ArrowLeft, History, Save, Trash2, PanelRight, Sparkles, ImagePlus } from "lucide-react";
 import { csrfHeaders, useAdminSession } from "../../admin/AdminSession";
 import { ArticlePresentation } from "../../article/components/ArticlePresentation";
 import { apiRequest } from "../../../lib/api/client";
-import type { AdminArticle } from "../../../lib/api/types";
+import type { AdminArticle, ArticleAccess } from "../../../lib/api/types";
 import { sourceFromDocument, type MarkdownDocument } from "../markdownDocument";
 import { EditorToolbar, type MarkdownCommand } from "./EditorToolbar";
 import { PublishPanel, type CoverSelection } from "./PublishPanel";
+import { ImageGenerator } from "./ImageGenerator";
 import { useArticlePreview } from "../hooks/useArticlePreview";
 import { htmlToMarkdown } from "../htmlToMarkdown";
 import { useWritingAssistant } from "../hooks/useWritingAssistant";
@@ -59,10 +60,15 @@ export function ArticleEditor({ publicId }: { publicId?: string }) {
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
   const [summary, setSummary] = useState("");
+  const [access, setAccess] = useState<ArticleAccess>({
+    column_public_id: null,
+    subscriber_only: false,
+  });
   const [source, setSource] = useState("");
   const [status, setStatus] = useState<"draft" | "published">("draft");
   const [publishedAt, setPublishedAt] = useState<string | null>(null);
   const [publishOpen, setPublishOpen] = useState(false);
+  const [imageGeneratorOpen, setImageGeneratorOpen] = useState(false);
   const [cover, setCover] = useState<CoverSelection>({ asset_public_id: null, media_url: null });
   const savedId = useRef(publicId);
   const draftSlug = useRef("");
@@ -90,6 +96,7 @@ export function ArticleEditor({ publicId }: { publicId?: string }) {
     cover,
     categories: selectedCategories,
     tags: selectedTags,
+    access,
   };
   const latestValues = useRef(values);
   latestValues.current = values;
@@ -124,6 +131,7 @@ export function ArticleEditor({ publicId }: { publicId?: string }) {
       setCover(value.cover);
       setSelectedCategories(value.categories);
       setSelectedTags(value.tags);
+      setAccess(value.access);
     }
     async function load() {
       let cached: ReturnType<typeof readEditorDraft> = null;
@@ -144,6 +152,7 @@ export function ArticleEditor({ publicId }: { publicId?: string }) {
           cover: { asset_public_id: null, media_url: null },
           categories: [],
           tags: [],
+          access: { column_public_id: null, subscriber_only: false },
         };
         if (!id) {
           lastSaved.current = JSON.stringify(empty);
@@ -177,6 +186,7 @@ export function ArticleEditor({ publicId }: { publicId?: string }) {
             cover: currentCover,
             categories: taxonomy.categories,
             tags: taxonomy.tags,
+            access: article.access,
           };
           lastSaved.current = JSON.stringify(stored);
           serverUpdatedAt.current = article.updated_at;
@@ -288,6 +298,7 @@ export function ArticleEditor({ publicId }: { publicId?: string }) {
             slug: captured.slug,
             summary: captured.summary || null,
             document: { type: "markdown", source: captured.source } satisfies MarkdownDocument,
+            access: captured.access,
             draft_only: automatic,
             expected_updated_at: serverUpdatedAt.current,
           }),
@@ -631,6 +642,13 @@ export function ArticleEditor({ publicId }: { publicId?: string }) {
                   <Sparkles size={16} />
                   AI 对话
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setImageGeneratorOpen(true)}
+                  title="生成正文配图"
+                >
+                  <ImagePlus size={16} /> 配图
+                </button>
               </div>
             </div>
           </div>
@@ -736,6 +754,8 @@ export function ArticleEditor({ publicId }: { publicId?: string }) {
           pending={pending}
           message={message || taxonomyError}
           published={status === "published"}
+          access={access}
+          onAccess={setAccess}
           onSlug={setSlug}
           onSummary={setSummary}
           onCover={setCover}
@@ -744,6 +764,23 @@ export function ArticleEditor({ publicId }: { publicId?: string }) {
           onUpload={uploadCover}
           onPublish={changePublication}
           onClose={() => setPublishOpen(false)}
+        />
+      )}
+      {imageGeneratorOpen && (
+        <ImageGenerator
+          purpose="inline"
+          title={title}
+          source={source}
+          onUse={(image, description) => {
+            const alt = description
+              .replaceAll("[", " ")
+              .replaceAll("]", " ")
+              .replaceAll("\\", " ")
+              .replaceAll("\n", " ")
+              .slice(0, 120);
+            insert("![", `](${image.media_url})`, alt);
+          }}
+          onClose={() => setImageGeneratorOpen(false)}
         />
       )}
     </section>

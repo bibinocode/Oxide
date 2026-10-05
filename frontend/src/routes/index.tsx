@@ -4,8 +4,9 @@ import { PixelMark, SectionTag } from "../components/layout/PrintMarks";
 import { getHomeData } from "../lib/api/server";
 import { SiteSection } from "../components/layout/SiteSection";
 import { ContentSkeleton } from "../components/layout/ContentSkeleton";
-import { RevealContent } from "../components/layout/RevealContent";
 import { HomeIntroduction } from "../features/home/HomeIntroduction";
+import { ColumnBookshelf } from "../features/columns/components/ColumnBookshelf";
+import { HomeContentSummary } from "../features/home/HomeContentSummary";
 
 export const Route = createFileRoute("/")({
   loader: () => getHomeData(),
@@ -14,7 +15,9 @@ export const Route = createFileRoute("/")({
 });
 
 function Home() {
-  const { site, articles, categories, tags } = Route.useLoaderData();
+  const { site, articles, columns } = Route.useLoaderData();
+  const latest = articles.items.slice(0, 6);
+  const center = (latest.length - 1) / 2;
   return (
     <main className="public-width pt-10 md:pt-14">
       {site.presentation?.home_intro?.enabled ? (
@@ -37,6 +40,12 @@ function Home() {
         </section>
       )}
 
+      <HomeContentSummary
+        articleCount={articles.total}
+        columnCount={columns.length}
+        projects={site.presentation?.projects}
+      />
+
       <section className="mt-16" aria-labelledby="writing-heading">
         <div className="flex items-center justify-between">
           <SectionTag index="01">
@@ -46,76 +55,38 @@ function Home() {
             查看全部
           </Link>
         </div>
-        <RevealContent className="mt-4">
-          {articles.items.length ? (
-            articles.items
-              .slice(0, 6)
-              .map((article) => <ArticleRow key={article.public_id} article={article} />)
+        <div className="home-writing-list mt-4">
+          {latest.length ? (
+            latest.map((article, index) => (
+              <div
+                key={article.public_id}
+                className="home-writing-enter"
+                style={{ animationDelay: `${240 + Math.abs(index - center) * 50}ms` }}
+              >
+                <ArticleRow article={article} showCover />
+              </div>
+            ))
           ) : (
             <p className="border-t border-line py-8 text-sm text-muted">还没有已发布的文章。</p>
           )}
-        </RevealContent>
+        </div>
       </section>
 
-      <section className="mt-16" aria-labelledby="categories-heading">
-        <SectionTag index="02">
-          <span id="categories-heading">分类</span>
-        </SectionTag>
-        <RevealContent className="mt-4 border-t border-line">
-          {categories.length ? (
-            categories.map((item) => (
-              <Link
-                key={item.slug}
-                to="/categories/$slug"
-                params={{ slug: item.slug }}
-                search={{ page: 1 }}
-                className="catalog-row group"
-              >
-                <span className="catalog-row-title group-hover:text-ink">{item.name}</span>
-                <span className="catalog-row-leader" aria-hidden="true" />
-                <span className="font-mono text-xs text-muted">/{item.slug}</span>
-              </Link>
-            ))
-          ) : (
-            <p className="py-6 text-sm text-muted">暂无分类。</p>
-          )}
-        </RevealContent>
-      </section>
-
-      {tags.length > 0 && (
-        <section className="mt-16" aria-labelledby="tags-heading">
-          <SectionTag index="03">
-            <span id="tags-heading">标签</span>
+      <section className="mt-16" aria-labelledby="columns-heading">
+        <div className="flex items-center justify-between">
+          <SectionTag index="02">
+            <span id="columns-heading">小册</span>
           </SectionTag>
-          <div className="mt-4 flex flex-wrap gap-x-5 gap-y-3 border-t border-line pt-5 text-sm">
-            {tags.map((item) => (
-              <Link
-                key={item.slug}
-                to="/tags/$slug"
-                params={{ slug: item.slug }}
-                search={{ page: 1 }}
-                className="text-muted hover:text-ink"
-              >
-                #{item.name}
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
+          <Link to="/columns" className="text-sm text-muted hover:text-ink">
+            查看全部
+          </Link>
+        </div>
+        <div className="mt-6">
+          <ColumnBookshelf columns={columns.slice(0, 6)} showDetails={false} />
+        </div>
+      </section>
 
-      <SiteSection
-        id="projects"
-        title="项目作品集"
-        index="04"
-        section={site.presentation?.projects}
-      />
-      <SiteSection id="services" title="服务" index="05" section={site.presentation?.services} />
-      <p className="mt-16 border-t border-line pt-5 font-mono text-xs text-muted">
-        {articles.total} 篇文章 ·{" "}
-        <a href="/feed.xml" className="hover:text-ink">
-          RSS 订阅
-        </a>
-      </p>
+      <SiteSection id="services" title="服务" index="03" section={site.presentation?.services} />
     </main>
   );
 }

@@ -6,6 +6,7 @@ use sea_orm::{
     ColumnTrait, DatabaseConnection, EntityTrait, FromQueryResult, PaginatorTrait, QueryFilter,
     QueryOrder, QuerySelect,
 };
+use std::collections::HashMap;
 
 use crate::{
     domain::article::{ArticleDetail, ArticlePage, ArticleRepository, ArticleSummary},
@@ -30,11 +31,14 @@ impl SeaOrmArticleRepository {
 /// 列表仅投影公开字段，避免加载正文 JSON 和 HTML。
 #[derive(FromQueryResult)]
 struct SummaryRow {
+    cover_asset_id: Option<i64>,
     public_id: uuid::Uuid,
     slug: String,
     title: String,
     summary: Option<String>,
     published_at: Option<chrono::DateTime<chrono::Utc>>,
+    paid_column_public_id: Option<uuid::Uuid>,
+    subscriber_only: bool,
 }
 
 /// 详情额外读取公开 HTML，不加载 Tiptap 文档和内部关联字段。
@@ -46,7 +50,10 @@ struct DetailRow {
     title: String,
     summary: Option<String>,
     published_at: Option<chrono::DateTime<chrono::Utc>>,
+    paid_column_public_id: Option<uuid::Uuid>,
+    subscriber_only: bool,
     rendered_html: String,
+    preview_html: Option<String>,
 }
 
 impl From<SummaryRow> for ArticleSummary {
@@ -56,17 +63,23 @@ impl From<SummaryRow> for ArticleSummary {
             slug: row.slug,
             title: row.title,
             summary: row.summary,
+            cover_url: None,
             published_at: row.published_at,
+            paid_column_public_id: row.paid_column_public_id,
+            subscriber_only: row.subscriber_only,
         }
     }
 }
 
 #[async_trait]
 impl ArticleRepository for SeaOrmArticleRepository {
-    /// 查询状态过滤在数据库执行，分页偏移使用已验证的页码。
+    /// 普通写作目录只包含未归属小册的已发布文章。
+    /// 小册中的免费与付费章节均由小册目录展示；计数和分页共用过滤条件，
+    /// 避免页面过滤造成条目不足或总数不一致。
     async fn list_published(&self, page: u64, per_page: u64) -> Result<ArticlePage> {
-        let base =
-            article::Entity::find().filter(article::Column::Status.eq(ArticleStatus::Published));
+        let base = article::Entity::find()
+            .filter(article::Column::Status.eq(ArticleStatus::Published))
+            .filter(article::Column::PaidColumnPublicId.is_null());
         let total = base.clone().count(&self.db).await?;
         let rows = base
             .select_only()
@@ -75,7 +88,10 @@ impl ArticleRepository for SeaOrmArticleRepository {
                 article::Column::Slug,
                 article::Column::Title,
                 article::Column::Summary,
+                article::Column::CoverAssetId,
                 article::Column::PublishedAt,
+                article::Column::PaidColumnPublicId,
+                article::Column::SubscriberOnly,
             ])
             .order_by_desc(article::Column::PublishedAt)
             .order_by_desc(article::Column::Id)
@@ -85,8 +101,30 @@ impl ArticleRepository for SeaOrmArticleRepository {
             .all(&self.db)
             .await?;
 
+        let ids: Vec<i64> = rows.iter().filter_map(|row| row.cover_asset_id).collect();
+        let covers: HashMap<i64, String> = if ids.is_empty() {
+            HashMap::new()
+        } else {
+            asset::Entity::find()
+                .filter(asset::Column::Id.is_in(ids))
+                .filter(asset::Column::Visibility.eq(AssetVisibility::Public))
+                .all(&self.db)
+                .await?
+                .into_iter()
+                .map(|row| (row.id, format!("/media/{}", row.public_id)))
+                .collect()
+        };
         Ok(ArticlePage {
-            items: rows.into_iter().map(Into::into).collect(),
+            items: rows
+                .into_iter()
+                .map(|row| {
+                    let cover_url = row.cover_asset_id.and_then(|id| covers.get(&id).cloned());
+                    ArticleSummary {
+                        cover_url,
+                        ..row.into()
+                    }
+                })
+                .collect(),
             total,
         })
     }
@@ -103,7 +141,10 @@ impl ArticleRepository for SeaOrmArticleRepository {
                 article::Column::Title,
                 article::Column::Summary,
                 article::Column::PublishedAt,
+                article::Column::PaidColumnPublicId,
+                article::Column::SubscriberOnly,
                 article::Column::RenderedHtml,
+                article::Column::PreviewHtml,
                 article::Column::CoverAssetId,
             ])
             .into_model::<DetailRow>()
@@ -119,15 +160,19 @@ impl ArticleRepository for SeaOrmArticleRepository {
             None
         };
         Ok(row.map(|row| ArticleDetail {
-            cover_url,
+            cover_url: cover_url.clone(),
             summary: ArticleSummary {
                 public_id: row.public_id,
                 slug: row.slug,
                 title: row.title,
                 summary: row.summary,
+                cover_url,
                 published_at: row.published_at,
+                paid_column_public_id: row.paid_column_public_id,
+                subscriber_only: row.subscriber_only,
             },
             rendered_html: row.rendered_html,
+            preview_html: row.preview_html,
         }))
     }
 }

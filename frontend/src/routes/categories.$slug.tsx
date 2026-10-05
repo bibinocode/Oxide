@@ -21,6 +21,13 @@ function CategoryPage() {
   const { label, articles } = Route.useLoaderData();
   return (
     <main className="public-width pt-10 md:pt-14">
+      <Link
+        to="/archive"
+        search={{ page: 1 }}
+        className="mb-6 inline-flex items-center gap-2 text-sm text-muted hover:text-accent"
+      >
+        <span aria-hidden="true">←</span> 全部归档
+      </Link>
       <PublicPageHeader title={label} detail={`分类 · ${articles.total} 篇文章`} />
       <RevealContent className="mt-8">
         {articles.items.map((article) => (

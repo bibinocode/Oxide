@@ -100,6 +100,10 @@ export function HomeIntroductionEditor({
         <div className="text-sm">
           <p className="mb-2">介绍正文</p>
           <HomeIntroRichEditor value={intro.body} onChange={(body) => update({ body })} />
+          <p className="mt-2 text-xs leading-6 text-muted">
+            像首页一样分段介绍自己：Enter 新建段落，Shift + Enter
+            换行；选中文字可强调或添加链接。社交主页与邮箱链接支持悬停资料卡。
+          </p>
           <p className="mt-2 text-right text-xs text-muted">{intro.body.length} / 2000</p>
         </div>
         <div className="home-intro-profile-fields border-t border-line pt-5">

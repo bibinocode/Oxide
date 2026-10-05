@@ -127,6 +127,9 @@ function AdminLayout() {
           <Link to="/admin/comments" activeProps={{ className: "is-active" }}>
             <MessageSquare size={17} /> 评论
           </Link>
+          <Link to="/admin/columns" activeProps={{ className: "is-active" }}>
+            <BookOpen size={17} /> 小册
+          </Link>
           <Link to="/admin/notion" activeProps={{ className: "is-active" }}>
             <BookOpen size={17} /> Notion 导入
           </Link>

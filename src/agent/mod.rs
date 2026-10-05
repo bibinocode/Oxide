@@ -1,6 +1,7 @@
 //! Agent 应用层：定义任务输入与产出规则，外部模型由基础设施层调用。
 
 pub mod context;
+pub mod image;
 pub mod skills;
 pub mod summary;
 pub mod tools;
@@ -14,3 +15,6 @@ pub struct TextGenerationOptions {
     pub temperature: f64,
     pub disable_reasoning: bool,
 }
+
+/// 评论审核的固定策略和结构化输出校验。
+pub mod comment_review;

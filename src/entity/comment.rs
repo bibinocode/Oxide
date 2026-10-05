@@ -36,6 +36,12 @@ pub struct Model {
     pub created_at: DateTimeUtc,
     /// 审核时间；未审核时为空。
     pub reviewed_at: Option<DateTimeUtc>,
+    /// 最近一次 Agent 审核的决定、理由、模型和时间，失败时仍保留待审状态。
+    pub agent_review: Option<Json>,
+    /// 最终审核来源；人工修改后 Agent 不可覆盖该决定。
+    pub review_source: Option<String>,
+    /// 人工处理或重提时递增，阻止先前模型请求写回过期结果。
+    pub review_version: i32,
     /// 所属文章。
     #[sea_orm(belongs_to, from = "article_id", to = "id")]
     pub article: BelongsTo<super::article::Entity>,
@@ -59,6 +65,9 @@ impl ActiveModelBehavior for ActiveModel {
             status: NotSet,
             created_at: NotSet,
             reviewed_at: NotSet,
+            agent_review: NotSet,
+            review_source: NotSet,
+            review_version: NotSet,
         }
     }
 

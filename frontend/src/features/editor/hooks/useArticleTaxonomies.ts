@@ -11,8 +11,8 @@ export function useArticleTaxonomies() {
   useEffect(() => {
     const controller = new AbortController();
     Promise.all([
-      apiRequest<Taxonomy[]>("/api/v1/categories", { signal: controller.signal }),
-      apiRequest<Taxonomy[]>("/api/v1/tags", { signal: controller.signal }),
+      apiRequest<Taxonomy[]>("/api/v1/admin/categories", { signal: controller.signal }),
+      apiRequest<Taxonomy[]>("/api/v1/admin/tags", { signal: controller.signal }),
     ])
       .then(([categoryItems, tagItems]) => {
         if (controller.signal.aborted) return;

@@ -23,7 +23,7 @@
   display: flex;
   min-height: 0;
   flex-direction: column;
-  border-right: 1px solid var(--page-line);
+  border-right: var(--border-hairline) solid var(--page-line);
   background: var(--color-paper);
   padding: 24px 14px;
 }
@@ -50,7 +50,7 @@
 }
 .admin-sidebar-nav a:hover,
 .admin-sidebar-nav a.is-active {
-  background: #eae8e2;
+  background: var(--preferences-control-bg);
   color: var(--page-text);
 }
 .admin-sidebar-footer {
@@ -58,7 +58,7 @@
   flex-direction: column;
   gap: 17px;
   margin-top: auto;
-  border-top: 1px solid var(--page-line);
+  border-top: var(--border-hairline) solid var(--page-line);
   padding: 20px 12px 4px;
 }
 .admin-main {

@@ -1,4 +1,5 @@
 import type { CoverSelection } from "./components/PublishPanel";
+import type { ArticleAccess } from "../../lib/api/types";
 
 /** 本地恢复只保存编辑内容，不保存模型密钥、AI 图片、会话 Cookie 或发布状态。 */
 export interface EditorDraftValues {
@@ -9,6 +10,7 @@ export interface EditorDraftValues {
   cover: CoverSelection;
   categories: string[];
   tags: string[];
+  access: ArticleAccess;
 }
 export interface StoredEditorDraft {
   version: 1;
@@ -43,6 +45,12 @@ export function readEditorDraft(key: string): StoredEditorDraft | null {
     (draft.savedId !== undefined && !/^[a-f0-9-]{36}$/i.test(draft.savedId))
   )
     throw new Error("本地草稿格式异常，未覆盖已有缓存");
+  value.access ??= { column_public_id: null, subscriber_only: false };
+  if (
+    (value.access.column_public_id !== null && typeof value.access.column_public_id !== "string") ||
+    typeof value.access.subscriber_only !== "boolean"
+  )
+    throw new Error("本地草稿访问配置异常，未覆盖已有缓存");
   return draft;
 }
 

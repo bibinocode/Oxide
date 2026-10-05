@@ -1,11 +1,9 @@
 @media (max-width: 640px) {
-  .site-footer-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
   .contact-preview-card {
     position: fixed;
+    top: auto;
     right: 16px;
-    bottom: 90px;
+    bottom: max(90px, calc(env(safe-area-inset-bottom) + 74px));
     left: 16px;
     width: auto;
   }

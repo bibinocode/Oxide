@@ -4,6 +4,76 @@ use anyhow::{Result, bail};
 use pulldown_cmark::{Event, Options, Parser, html};
 use serde_json::Value;
 
+/// 公开文章大纲只含二、三级标题的文字；不携带标题内链接、属性或正文节点。
+pub fn heading_outline(html: &str) -> Vec<(u8, String)> {
+    let fragment = scraper::Html::parse_fragment(html);
+    let selector = scraper::Selector::parse("h2, h3").expect("静态标题选择器有效");
+    fragment
+        .select(&selector)
+        .map(|heading| {
+            let level = if heading.value().name() == "h2" { 2 } else { 3 };
+            (level, heading.text().collect::<String>().trim().to_owned())
+        })
+        .collect()
+}
+
+/// 从已净化的正文按可见文字数量生成前 30% 试看；不接受客户端指定截取范围。
+/// 使用 HTML 树裁剪并重新配对标签，截断后的文字、节点和属性均不会进入响应。
+pub fn preview_html(html: &str) -> String {
+    let fragment = scraper::Html::parse_fragment(html);
+    let root = fragment.root_element();
+    let total = root.text().map(|text| text.chars().count()).sum::<usize>();
+    let mut remaining = total * 3 / 10;
+    let mut output = String::new();
+    preview_children(root, &mut remaining, &mut output);
+    output
+}
+
+/// 遍历正文树的前缀；预算耗尽后停止遍历，但始终闭合已输出的容器。
+fn preview_children(element: scraper::ElementRef<'_>, remaining: &mut usize, output: &mut String) {
+    for child in element.children() {
+        if *remaining == 0 {
+            break;
+        }
+        match child.value() {
+            scraper::Node::Text(text) => {
+                let prefix: String = text.chars().take(*remaining).collect();
+                *remaining -= prefix.chars().count();
+                output.push_str(&html_escape::encode_safe(&prefix));
+            }
+            scraper::Node::Element(_) => {
+                let Some(child) = scraper::ElementRef::wrap(child) else {
+                    continue;
+                };
+                let name = child.value().name();
+                output.push('<');
+                output.push_str(name);
+                // 只保留排版与链接所需属性，避免 title 等不可见文本透露正文。
+                for (key, value) in child.value().attrs() {
+                    if matches!(
+                        key,
+                        "href" | "src" | "class" | "type" | "disabled" | "checked"
+                    ) {
+                        output.push(' ');
+                        output.push_str(key);
+                        output.push_str("=\"");
+                        output.push_str(&html_escape::encode_double_quoted_attribute(value));
+                        output.push('"');
+                    }
+                }
+                output.push('>');
+                if !matches!(name, "img" | "br" | "hr" | "input") {
+                    preview_children(child, remaining, output);
+                    output.push_str("</");
+                    output.push_str(name);
+                    output.push('>');
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
 /// 限制单篇文章的输入和输出大小，防止深度嵌套消耗过多内存。
 pub fn render_document(document: &Value) -> Result<String> {
     if serde_json::to_vec(document)?.len() > 256 * 1024 {
@@ -185,6 +255,27 @@ fn wrap(node: &Value, output: &mut String, depth: usize, tag: &str) -> Result<()
 mod tests {
     use super::*;
     use serde_json::json;
+
+    /// 中文按字符裁剪，后续节点与隐藏属性不能泄露，嵌套标签必须闭合。
+    #[test]
+    fn preview_limits_visible_text_and_excludes_hidden_content() {
+        let html = "<p title=\"SECRET\"><strong>一二三四五六七八九十</strong></p><p>SECRET</p>";
+        assert_eq!(preview_html(html), "<p><strong>一二三四</strong></p>");
+        assert_eq!(preview_html("<p>一</p>"), "");
+        assert_eq!(
+            preview_html("<p>1234567890</p><img src=\"/secret\">"),
+            "<p>123</p>"
+        );
+    }
+
+    /// 完整大纲仅输出标题，标题属性和随后的隐藏正文不会进入公开数据。
+    #[test]
+    fn outline_contains_only_heading_text() {
+        assert_eq!(
+            heading_outline("<h2 title=\"secret\">第一节</h2><p>secret</p><h3>第二节</h3>"),
+            vec![(2, "第一节".into()), (3, "第二节".into())]
+        );
+    }
 
     #[test]
     fn escapes_untrusted_text_and_rejects_unknown_nodes() {

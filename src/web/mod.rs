@@ -46,6 +46,8 @@ pub struct AppState {
     pub search: Arc<SearchEngine>,
     /// Notion 集成密钥；未配置时管理端同步接口返回明确错误。
     pub notion_api_key: Option<Arc<str>>,
+    /// 微信支付配置；不存在时不会创建订单或授予访问权。
+    pub wechat_pay: Option<Arc<crate::config::WechatPayConfig>>,
 }
 
 /// 统一错误格式，便于前端按 code 分支处理。
@@ -78,8 +80,14 @@ pub struct ArticleSummaryResponse {
     pub title: String,
     /// 可选摘要。
     pub summary: Option<String>,
+    /// 已公开主图的稳定媒体地址。
+    pub cover_url: Option<String>,
     /// 首次发布时间。
     pub published_at: Option<DateTime<Utc>>,
+    /// 所属专栏，普通文章为空。
+    pub paid_column_public_id: Option<Uuid>,
+    /// 订阅篇章标识，仅用于界面展示，权限由 Axum 判断。
+    pub subscriber_only: bool,
 }
 
 impl From<article::ArticleSummary> for ArticleSummaryResponse {
@@ -89,7 +97,10 @@ impl From<article::ArticleSummary> for ArticleSummaryResponse {
             slug: value.slug,
             title: value.title,
             summary: value.summary,
+            cover_url: value.cover_url,
             published_at: value.published_at,
+            paid_column_public_id: value.paid_column_public_id,
+            subscriber_only: value.subscriber_only,
         }
     }
 }
@@ -109,6 +120,17 @@ pub struct ArticlePageResponse {
 
 /// 文章详情响应，HTML 已在发布流程中生成并净化。
 #[derive(Debug, Serialize, ToSchema)]
+pub struct ArticleHeadingResponse {
+    /// 二级或三级标题。
+    pub level: u8,
+    /// 公开大纲文字，不含正文 HTML。
+    pub label: String,
+    /// 当前请求是否可跳转到该正文小节。
+    pub available: bool,
+}
+
+/// 正文与公开大纲分离，未订阅者也能查看完整目录。
+#[derive(Debug, Serialize, ToSchema)]
 pub struct ArticleDetailResponse {
     /// 对外 UUID。
     pub public_id: Uuid,
@@ -120,8 +142,18 @@ pub struct ArticleDetailResponse {
     pub summary: Option<String>,
     /// 首次发布时间。
     pub published_at: Option<DateTime<Utc>>,
+    /// 专栏公开标识。
+    pub paid_column_public_id: Option<Uuid>,
+    /// 是否为订阅篇章。
+    pub subscriber_only: bool,
+    /// 当前请求是否仅可阅读公开试看。
+    pub locked: bool,
+    /// 专栏 URL 标识，供读者购买入口使用。
+    pub column_slug: Option<String>,
     /// 已保存的公开 HTML。
     pub rendered_html: String,
+    /// 全文小节大纲；锁定的小节只公开标题。
+    pub outline: Vec<ArticleHeadingResponse>,
     /// 公开封面素材路径。
     pub cover_url: Option<String>,
 }
@@ -137,21 +169,24 @@ pub struct HealthResponse {
 #[derive(OpenApi)]
 #[openapi(
     paths(client::articles::list_articles, client::articles::get_article, live, ready, admin::auth::login, admin::auth::current, admin::auth::logout,
+        client::reader::register, client::reader::login, client::reader::current, client::reader::logout,
+        client::columns::list, client::columns::detail, client::checkout::create, client::checkout::status, client::checkout::notify,
+        admin::columns::create, admin::columns::update, admin::columns::list, admin::columns::visibility, admin::columns::delete,
         admin::preview::preview, admin::cover::get, admin::cover::update,
         admin::content::list, admin::content::create, admin::content::get, admin::content::update,
         admin::content::publish, admin::content::unpublish, admin::content::revisions, admin::content::delete,
         client::content::site, client::content::categories, client::content::tags, client::content::feed,
         client::content::category_articles, client::content::tag_articles, client::search::search_articles,
-        client::comments::list, client::comments::create, client::comments::avatar, admin::comments::admin_list, admin::comments::review, admin::comments::delete,
+        client::comments::list, client::comments::create, client::comments::avatar, admin::comments::admin_list, admin::comments::review, admin::comments::delete, admin::comments::agent_review,
         admin::settings::update_site, admin::settings::create_category, admin::settings::update_category,
         admin::settings::delete_category, admin::settings::create_tag, admin::settings::update_tag,
-        admin::settings::delete_tag, admin::taxonomy::get, admin::taxonomy::update,
+        admin::settings::delete_tag, admin::settings::list_category, admin::settings::list_tag, admin::settings::visibility_category, admin::settings::visibility_tag, admin::taxonomy::get, admin::taxonomy::update,
         admin::storage::providers, admin::storage::create_provider, admin::storage::update_provider, admin::storage::activate_provider,
         admin::storage::delete_provider, admin::storage::assets, admin::storage::upload, admin::storage::set_visibility,
         admin::storage::delete_asset, client::media::media,
         admin::agent::providers, admin::agent::create_provider, admin::agent::update_provider,
         admin::agent::delete_provider, admin::agent::bindings, admin::agent::bind_task,
-        admin::agent::summary::generate, admin::agent::writing::generate,
+        admin::agent::summary::generate, admin::agent::image::generate, admin::agent::writing::generate,
         admin::agent::writing::stream, admin::agent::writing::capabilities,
         admin::agent::tools::list, admin::agent::tools::update, admin::agent::tools::test,
         admin::agent::skills::list, admin::agent::skills::get, admin::agent::skills::install,
@@ -159,6 +194,10 @@ pub struct HealthResponse {
         admin::agent::skills::update, admin::agent::skills::set_enabled, admin::agent::skills::delete,
         client::link_preview::preview, admin::notion::pages, admin::notion::sync),
     components(schemas(ApiError, ArticleSummaryResponse, ArticlePageResponse, ArticleDetailResponse, HealthResponse,
+        client::reader::ReaderCredentials, client::reader::ReaderSessionResponse,
+        client::columns::ColumnResponse, client::columns::ColumnDetailResponse,
+        client::checkout::CheckoutResponse, client::checkout::OrderResponse,
+        admin::columns::ColumnInput, admin::ContentVisibilityInput, admin::content::ArticleAccessInput,
         admin::auth::LoginRequest, admin::auth::SessionResponse, admin::auth::OkResponse,
         admin::preview::PreviewInput, admin::preview::PreviewResponse, admin::cover::CoverInput, admin::cover::CoverResponse,
         admin::content::ArticleInput, admin::content::AdminArticleResponse, admin::content::AdminArticlePage,
@@ -169,7 +208,8 @@ pub struct HealthResponse {
         admin::storage::ProviderInput, admin::storage::ProviderResponse, admin::storage::AssetResponse, admin::storage::VisibilityInput,
         admin::agent::ProviderInput, admin::agent::ProviderResponse, admin::agent::BindingInput,
         admin::agent::BindingResponse, admin::agent::summary::SummaryInput,
-        admin::agent::summary::SummaryResponse, admin::agent::writing::WritingInput,
+        admin::agent::summary::SummaryResponse, admin::agent::image::ImageInput,
+        admin::agent::image::ImageOutput, crate::agent::image::ImagePurpose, admin::agent::writing::WritingInput,
         admin::agent::writing::WritingResponse, admin::agent::writing::WritingCapabilities,
         crate::agent::writing_image::WritingImage, crate::agent::writing::WritingAction,
         crate::domain::agent_skill::SkillSummary, crate::infrastructure::agent_skills::SkillDetail,
@@ -185,7 +225,8 @@ pub struct HealthResponse {
     tags((name = "articles", description = "公开文章"), (name = "health", description = "进程健康检查"),
         (name = "admin", description = "管理员内容和会话"), (name = "site", description = "站点和订阅"),
         (name = "taxonomy", description = "分类和标签"), (name = "comments", description = "匿名评论"),
-        (name = "agent", description = "Agent 核心模型配置"))
+        (name = "agent", description = "Agent 核心模型配置"),
+        (name = "reader", description = "读者账号"), (name = "columns", description = "专栏和微信支付"))
 )]
 pub struct ApiDoc;
 
@@ -198,6 +239,21 @@ pub fn router(state: AppState) -> Router {
             get(admin::cover::get).put(admin::cover::update),
         )
         .route("/api/v1/articles", get(client::articles::list_articles))
+        .route("/api/v1/columns", get(client::columns::list))
+        .route("/api/v1/columns/{slug}", get(client::columns::detail))
+        .route(
+            "/api/v1/columns/{slug}/checkout",
+            post(client::checkout::create),
+        )
+        .route("/api/v1/reader/register", post(client::reader::register))
+        .route("/api/v1/reader/login", post(client::reader::login))
+        .route("/api/v1/reader/session", get(client::reader::current))
+        .route("/api/v1/reader/logout", post(client::reader::logout))
+        .route(
+            "/api/v1/reader/orders/{order_id}",
+            get(client::checkout::status),
+        )
+        .route("/api/v1/wechat/notify", post(client::checkout::notify))
         .route(
             "/api/v1/articles/{slug}",
             get(client::articles::get_article),
@@ -228,8 +284,22 @@ pub fn router(state: AppState) -> Router {
         )
         .route("/api/v1/admin/comments", get(admin::comments::admin_list))
         .route(
+            "/api/v1/admin/columns",
+            get(admin::columns::list).post(admin::columns::create),
+        )
+        .route(
+            "/api/v1/admin/columns/{public_id}",
+            axum::routing::put(admin::columns::update)
+                .patch(admin::columns::visibility)
+                .delete(admin::columns::delete),
+        )
+        .route(
             "/api/v1/admin/comments/{public_id}",
             axum::routing::patch(admin::comments::review).delete(admin::comments::delete),
+        )
+        .route(
+            "/api/v1/admin/comments/{public_id}/agent-review",
+            post(admin::comments::agent_review),
         )
         .route(
             "/api/v1/admin/site",
@@ -237,17 +307,23 @@ pub fn router(state: AppState) -> Router {
         )
         .route(
             "/api/v1/admin/categories",
-            post(admin::settings::create_category),
+            get(admin::settings::list_category).post(admin::settings::create_category),
         )
         .route(
             "/api/v1/admin/categories/{slug}",
             axum::routing::put(admin::settings::update_category)
+                .patch(admin::settings::visibility_category)
                 .delete(admin::settings::delete_category),
         )
-        .route("/api/v1/admin/tags", post(admin::settings::create_tag))
+        .route(
+            "/api/v1/admin/tags",
+            get(admin::settings::list_tag).post(admin::settings::create_tag),
+        )
         .route(
             "/api/v1/admin/tags/{slug}",
-            axum::routing::put(admin::settings::update_tag).delete(admin::settings::delete_tag),
+            axum::routing::put(admin::settings::update_tag)
+                .patch(admin::settings::visibility_tag)
+                .delete(admin::settings::delete_tag),
         )
         .route("/api/v1/admin/login", post(admin::auth::login))
         .route("/api/v1/admin/logout", post(admin::auth::logout))
@@ -340,6 +416,10 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/api/v1/admin/agent/summary",
             post(admin::agent::summary::generate),
+        )
+        .route(
+            "/api/v1/admin/agent/image",
+            post(admin::agent::image::generate),
         )
         .route(
             "/api/v1/admin/agent/writing",
@@ -445,6 +525,7 @@ mod tests {
             Ok((slug == "hello").then(|| article::ArticleDetail {
                 summary: sample(),
                 rendered_html: "<p>你好</p>".into(),
+                preview_html: None,
                 cover_url: None,
             }))
         }
@@ -457,7 +538,10 @@ mod tests {
             slug: "hello".into(),
             title: "Hello".into(),
             summary: Some("摘要".into()),
+            cover_url: None,
             published_at: None,
+            paid_column_public_id: None,
+            subscriber_only: false,
         }
     }
 
@@ -482,6 +566,7 @@ mod tests {
             public_base_url: Arc::from("http://127.0.0.1:3000"),
             search: Arc::new(SearchEngine::in_memory()),
             notion_api_key: None,
+            wechat_pay: None,
         })
     }
 

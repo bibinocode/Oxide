@@ -63,9 +63,11 @@ Axum 0.8.9 默认监听 `127.0.0.1:3001`。TanStack Start 开发服务监听 `12
 
 Notion 同步仅供管理员手动执行。后端配置 `NOTION_API_KEY` 后，在 Notion 中将文章页面共享给集成；进入后台“Notion 导入”搜索并导入。首次导入创建草稿；以后按 Notion 页面 ID 更新同一篇文章，保留本站 UUID、slug、发布状态，并将旧正文写入修订历史。若本站正文在上次同步后有修改，返回 `409 notion_local_changes`；确认后使用 `{ "force": true }` 覆盖。响应含 `outcome`（`created`、`updated`、`unchanged`）、`article` 与 `warnings`。当前同步覆盖标题、摘要和正文，不同步分类、标签及封面。Notion 托管图片转存到当前启用的 OSS，需先在后台配置上传源；不支持的块在 `warnings` 中提示。单篇上限 500 个块、6 层嵌套和 30 张图片。
 
-文章详情新增 `cover_url`，为空时不渲染主图占位。后台主图响应为 `asset_public_id` 和 `media_url`，不返回素材内部 ID。新草稿无需用户填写 slug，编辑器先生成稳定临时地址，发布面板可修改。
+文章列表和详情提供 `cover_url`，为空时不渲染主图占位。后台主图响应为 `asset_public_id` 和 `media_url`，不返回素材内部 ID。新草稿无需用户填写 slug，编辑器先生成稳定临时地址，发布面板可修改。
 
-`presentation` 包含 `home_intro`、`footer_text`、`contacts`、`projects`、`services`。`home_intro` 为 `{ "enabled": false, "body": "介绍 [GitHub](https://github.com/example)", "portrait_url": "/media/{uuid}", "portrait_alt": "个人肖像", "xiaohongshu": { "url": "", "name": "", "handle": "", "bio": "", "followers": "", "likes": "" } }`；肖像必须是已公开的本站图片素材，正文最多 2000 字。`body` 使用 Markdown 存储，后台提供所见即所得编辑；首页支持段落、粗体、斜体和链接。GitHub、X、YouTube、Telegram、小红书个人主页及 `mailto:` 链接显示平台卡片；普通 HTTPS 链接显示网页预览。`xiaohongshu` 为站长维护的公开资料快照，只有 `url` 与正文中的小红书个人主页链接匹配时才显示姓名、账号、简介、粉丝和获赞收藏数，头像使用首页肖像；空 `url` 时其余字段也必须为空。小红书分享链接保存时移除临时跟踪参数；未配置资料且平台拒绝抓取时，卡片显示链接文字与平台标识。后三者结构为 `{ "enabled": false, "items": [{ "title": "名称", "url": "https://example.com", "description": "说明", "avatar_url": "https://example.com/avatar.jpg", "stat_text": "128 位订阅者" }] }`。`avatar_url` 和 `stat_text` 可选，用于联系方式悬停卡片；旧配置无需迁移。关闭模块保留条目，数组顺序即展示顺序。保存站点时省略 `presentation` 将保留旧值；不在此对象保存私密 AI 或 OSS 配置。数据库需应用 `m20260928_000003_site_presentation` 迁移。
+`POST /api/v1/admin/agent/image` 接收文章标题、Markdown 正文、画面要求和 `cover` / `inline` 用途，返回私有素材的 UUID 与稳定地址。管理员确认采用后通过 `PATCH /api/v1/admin/assets/{public_id}` 公开素材，再选择主图或插入正文。
+
+`presentation` 包含 `home_intro`、`about_body`、`footer_text`、`contacts`、`projects`、`services`。`about_body` 为独立关于页面的 Markdown 正文，最多 20000 个 Unicode 字符，默认空字符串；在后台“设置 → 关于我”编辑，旧配置无需新增迁移。`home_intro` 为 `{ "enabled": false, "body": "介绍 [GitHub](https://github.com/example)", "portrait_url": "/media/{uuid}", "portrait_alt": "个人肖像", "xiaohongshu": { "url": "", "name": "", "handle": "", "bio": "", "followers": "", "likes": "" } }`；肖像必须是已公开的本站图片素材，正文最多 2000 字。`body` 使用 Markdown 存储，后台提供所见即所得编辑；首页支持段落、换行、粗体、斜体、列表和链接，后台提供实时排版预览、撤销与重做。GitHub、X、YouTube、Telegram、小红书个人主页及 `mailto:` 链接显示平台卡片；普通 HTTPS 链接显示网页预览。`xiaohongshu` 为站长维护的公开资料快照，只有 `url` 与正文中的小红书个人主页链接匹配时才显示姓名、账号、简介、粉丝和获赞收藏数，头像使用首页肖像；空 `url` 时其余字段也必须为空。小红书分享链接保存时移除临时跟踪参数；未配置资料且平台拒绝抓取时，卡片显示链接文字与平台标识。后三者结构为 `{ "enabled": false, "items": [{ "title": "名称", "url": "https://example.com", "description": "说明", "avatar_url": "https://example.com/avatar.jpg", "stat_text": "128 位订阅者" }] }`。`avatar_url` 和 `stat_text` 可选，用于联系方式悬停卡片；旧配置无需迁移。关闭模块保留条目，数组顺序即展示顺序。保存站点时省略 `presentation` 将保留旧值；不在此对象保存私密 AI 或 OSS 配置。数据库需应用 `m20260928_000003_site_presentation` 迁移。
 
 ## 搜索与素材
 
@@ -94,3 +96,13 @@ Agent 提供商配置独立于公开站点设置。`adapter` 可为 `openai_comp
 编辑器使用 `POST /api/v1/admin/agent/writing/stream`，请求体和鉴权与普通写作接口相同，成功响应为 `text/event-stream`。`event: delta` 的 JSON 数据为 `{ "content": "增量" }`；`event: done` 返回经过服务端校验的完整候选，只有收到此事件后才能采纳；`event: error` 返回 `{ "message": "错误说明" }`。连接中断或管理员关闭助手后取消客户端读取，正文保持不变。流式调用过程中的错误通过 `error` 事件报告，因此连接已建立后 HTTP 状态仍为 200。
 
 正文中写普通 Markdown 链接即可：`[网页标题](https://example.com/article)`。服务端渲染器继续净化 URL；前台与编辑器右侧共用外链增强，自动补 favicon，鼠标或键盘聚焦时请求网页预览。触屏设备保持普通可点击链接。抓取仅允许公网 HTTP(S)，禁止重定向，限制响应大小和耗时，Redis 缓存一天；目标网页拒绝抓取或没有 Open Graph 图片时只显示可取得的文字信息。
+
+### 内容上下架、隐藏及删除
+
+管理端读取 `/api/v1/admin/columns`、`/api/v1/admin/categories`、`/api/v1/admin/tags`，包含隐藏记录；对应公开列表仅包含可见项。对管理端单项路径 PATCH `{ "visible": false }` 隐藏，true 恢复。文章沿用 publish/unpublish 和 DELETE，后台文章列表及小册目录提供直接入口。
+
+删除分类或标签在 SeaORM 事务中移除文章关联，文章保留。小册 DELETE 仅允许没有文章、订单、订阅的记录，存在关联返回 409；下架阻止新下单，但保留已购访问。
+
+`GET /api/v1/admin/comments?page=1&status=all` 每页 50 条，可筛选 pending、approved、rejected、hidden。PATCH 单条评论 `{ "status": "approved|rejected|pending" }` 为人工通过、拒绝、隐藏；DELETE 顶层评论同时删除回复。人工操作递增审核版本，旧 Agent 请求无法覆盖。POST `/api/v1/admin/comments/{public_id}/agent-review` 重新加入持久化审核队列，未绑定模型返回 409。响应包含 article_title、review_source、reviewed_at、agent_review（决定、理由、模型和时间）。
+
+模型绑定新增任务 `comment_review`，PUT `/api/v1/admin/agent/bindings/comment_review` 的 provider_id 为空字符串时关闭。只在显式绑定可用文本模型后自动审核，未绑定时保持人工审核。

@@ -136,7 +136,8 @@ async fn import_one(
         bail!("Notion 图片尺寸过大");
     }
     let public_id = Uuid::new_v4();
-    let key = format!("assets/{public_id}.{extension}");
+    let created_at = Utc::now();
+    let key = crate::domain::asset::image_object_key(public_id, created_at, extension);
     let size_bytes = data.len() as i64;
     storage::put(provider, server_key, &key, Bytes::from(data), mime).await?;
     let row = asset::ActiveModel {
@@ -148,7 +149,7 @@ async fn import_one(
         width: Set(Some(dimensions.width as i32)),
         height: Set(Some(dimensions.height as i32)),
         visibility: Set(AssetVisibility::Public),
-        created_at: Set(Utc::now()),
+        created_at: Set(created_at),
         ..Default::default()
     }
     .insert(db)

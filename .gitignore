@@ -6,3 +6,47 @@
 /frontend/dist
 /data
 /.playwright-mcp
+
+# 独立容器运行凭据，不进入版本控制或镜像上下文。
+**/app.env
+**/backup.env
+
+# 本地 Agent 配置、编辑器缓存及系统文件。
+/.agents/
+/.codex/
+.DS_Store
+
+# 环境凭据与其备份；只保留不含真实密钥的示例模板。
+.env.*
+*.env
+*.env.*
+!.env.example
+!*.env.example
+
+# 数据库快照、恢复材料和运行日志。
+*.dump
+*.sql
+*.sqlite
+*.sqlite3
+*.db
+*.rdb
+*.aof
+*.age
+*.log
+*.bak
+*.backup
+/backups/
+/backup-recovery/
+
+# 私钥、证书与本地制品归档。
+age-key.txt
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+*.tar
+*.tar.gz
+*.tgz
+*.zip

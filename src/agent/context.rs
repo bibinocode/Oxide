@@ -24,6 +24,16 @@ pub struct AgentContext {
 }
 
 impl AgentContext {
+    /// 无 Skill 和网络工具的固定策略上下文，供自动审核等受限任务使用。
+    pub fn restricted(system: &str) -> Self {
+        Self {
+            system: system.to_owned(),
+            reader: None,
+            web_search: None,
+            webfetch: None,
+        }
+    }
+
     /// 明确文章链接在模型调用前读取，复用本轮 webfetch 次数预算。
     pub async fn fetch_page(&self, url: String) -> std::result::Result<PageContent, PageError> {
         let reader = self.webfetch.as_ref().ok_or(PageError::Disabled)?;

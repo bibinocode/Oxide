@@ -10,6 +10,8 @@ pub struct Model {
     /// 分类主键。
     #[sea_orm(primary_key)]
     pub id: i64,
+    /// 是否在公开目录展示；隐藏不删除文章或历史权益。
+    pub visible: bool,
     /// 显示名称。
     pub name: String,
     /// 分类 URL 使用的唯一标识。

@@ -103,6 +103,8 @@ impl XiaohongshuCard {
 pub struct SitePresentation {
     /// 首页个人介绍。
     pub home_intro: HomeIntroduction,
+    /// 关于页面正文，使用 Markdown 保存，空值表示尚未编写。
+    pub about_body: String,
     /// 页脚署名；空值时使用站点名称。
     pub footer_text: String,
     /// 联系方式列表。
@@ -117,6 +119,7 @@ impl SitePresentation {
     /// 校验公开文本和链接；只接受 HTTP(S)、mailto 和站内路径。
     pub fn is_valid(&self) -> bool {
         self.footer_text.chars().count() <= 200
+            && self.about_body.chars().count() <= 20000
             && self.home_intro.body.chars().count() <= 2000
             && self.home_intro.portrait_alt.chars().count() <= 120
             && self.home_intro.xiaohongshu.is_valid()
@@ -212,6 +215,20 @@ mod tests {
         assert!(config.is_valid());
         config.home_intro.xiaohongshu.url =
             "https://xiaohongshu.com.evil.test/user/profile/5cbba503000000001101b6a2".into();
+        assert!(!config.is_valid());
+    }
+
+    /// 旧展示配置无需迁移；关于正文按 Unicode 字符限制，而不是 UTF-8 字节数。
+    #[test]
+    fn about_content_is_backward_compatible_and_bounded() {
+        let mut config: SitePresentation = serde_json::from_str("{}").unwrap();
+        assert!(config.about_body.is_empty());
+        config.about_body = "我".repeat(20000);
+        assert!(config.is_valid());
+        let stored = serde_json::to_string(&config).unwrap();
+        let restored: SitePresentation = serde_json::from_str(&stored).unwrap();
+        assert_eq!(restored.about_body, config.about_body);
+        config.about_body.push('我');
         assert!(!config.is_valid());
     }
 }

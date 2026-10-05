@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" fill="none">
+  <title>举着手机自拍的马头头像</title>
+  <!-- 原创黑白线稿：保留参考照片的马耳、长鼻与举手机姿势，透明背景适合导航。 -->
+  <g stroke="#202020" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <!-- 颈部和肩膀以简洁轮廓收尾，缩小时仍能看清头像剪影。 -->
+    <path d="M33 64 31 74C20 76 13 82 11 91h73c-2-12-9-17-24-19l-4-9" fill="#fff"/>
+    <path d="m32 74 11 10 15-11M23 82l-2 9M68 81l3 10"/>
+    <!-- 向外张开的马耳，黑色内耳与鬃毛构成第一层识别特征。 -->
+    <path d="M29 28C21 23 17 11 20 5c7 2 14 9 18 19M55 23C61 13 68 6 75 5c2 10-3 20-12 26" fill="#fff"/>
+    <path d="M26 13c1 5 4 9 7 11M68 14l-7 11" stroke-width="4"/>
+    <!-- 长脸略微侧向手机，嘴鼻用少量粗线保持小尺寸可读性。 -->
+    <path d="M31 24c9-6 22-5 29 3 8 9 5 19 1 28l-1 10c-1 8-13 12-24 9-10-2-15-8-13-16l4-16c-3-7-2-13 4-18Z" fill="#fff"/>
+    <path d="M28 27c-2-7 3-13 12-13 6 0 8 4 14 2l-2 6c6-2 10 2 11 9l-8-2-5-4-12 2-6 5Z" fill="#202020" stroke="none"/>
+    <path d="m29 37 8-2M48 35l9 2"/>
+    <path d="M30 40c2-2 5-2 7 0M48 40c2-2 5-2 7 0" stroke-width="2"/>
+    <path d="M34 40v3M51 40v3" stroke-width="3"/>
+    <path d="m42 42-4 10M27 55c8-5 21-5 31 0" stroke-width="1.5"/>
+    <ellipse cx="31" cy="60" rx="2.2" ry="3.2" fill="#202020" stroke="none" transform="rotate(20 31 60)"/>
+    <ellipse cx="50" cy="60" rx="2.2" ry="3.2" fill="#202020" stroke="none" transform="rotate(-20 50 60)"/>
+    <path d="M32 68c5 3 11 3 16 0" stroke-width="2"/>
+    <!-- 手机与握持的蹄子叠在脸侧，不依赖细碎纹理表达自拍动作。 -->
+    <rect x="61" y="45" width="19" height="31" rx="3.5" fill="#202020"/>
+    <rect x="64" y="48" width="5" height="7" rx="2" fill="#fff" stroke="none"/>
+    <circle cx="66.5" cy="50.5" r="1" fill="#202020" stroke="none"/>
+    <path d="M79 66c5 4 4 10 0 15-3 3-8 4-13 1l-7-5c-3-2-3-6 0-7 2-1 5 1 8 3l-4-6c-1-3 1-5 3-4l8 5" fill="#fff"/>
+    <path d="m68 74 6 3m-5-8 6 4" stroke-width="1.7"/>
+  </g>
+</svg>

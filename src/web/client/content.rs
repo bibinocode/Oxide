@@ -30,6 +30,8 @@ struct ArticleRow {
     title: String,
     summary: Option<String>,
     published_at: Option<chrono::DateTime<chrono::Utc>>,
+    paid_column_public_id: Option<uuid::Uuid>,
+    subscriber_only: bool,
 }
 
 /// 公开站点配置；不输出当前存储提供商等内部配置。
@@ -48,6 +50,8 @@ pub struct SiteResponse {
 /// 分类或标签的公开模型。
 #[derive(Serialize, ToSchema)]
 pub struct TaxonomyResponse {
+    /// 是否公开展示，管理端仍可恢复隐藏条目。
+    pub visible: bool,
     /// 展示名称。
     pub name: String,
     /// URL 标识。
@@ -90,6 +94,7 @@ pub async fn site(State(state): State<AppState>) -> Response {
 #[utoipa::path(get, path = "/api/v1/categories", responses((status = 200, body = Vec<TaxonomyResponse>), (status = 500, body = ApiError)), tag = "taxonomy")]
 pub async fn categories(State(state): State<AppState>) -> Response {
     match category::Entity::find()
+        .filter(category::Column::Visible.eq(true))
         .order_by_asc(category::Column::Name)
         .all(&state.db)
         .await
@@ -99,6 +104,7 @@ pub async fn categories(State(state): State<AppState>) -> Response {
                 .map(|row| TaxonomyResponse {
                     name: row.name,
                     slug: row.slug,
+                    visible: row.visible,
                 })
                 .collect::<Vec<_>>(),
         )
@@ -118,6 +124,7 @@ pub async fn categories(State(state): State<AppState>) -> Response {
 #[utoipa::path(get, path = "/api/v1/tags", responses((status = 200, body = Vec<TaxonomyResponse>), (status = 500, body = ApiError)), tag = "taxonomy")]
 pub async fn tags(State(state): State<AppState>) -> Response {
     match tag::Entity::find()
+        .filter(tag::Column::Visible.eq(true))
         .order_by_asc(tag::Column::Name)
         .all(&state.db)
         .await
@@ -127,6 +134,7 @@ pub async fn tags(State(state): State<AppState>) -> Response {
                 .map(|row| TaxonomyResponse {
                     name: row.name,
                     slug: row.slug,
+                    visible: row.visible,
                 })
                 .collect::<Vec<_>>(),
         )
@@ -151,6 +159,7 @@ pub async fn category_articles(
 ) -> Response {
     let category = match category::Entity::find()
         .filter(category::Column::Slug.eq(slug))
+        .filter(category::Column::Visible.eq(true))
         .one(&state.db)
         .await
     {
@@ -182,6 +191,7 @@ pub async fn tag_articles(
 ) -> Response {
     let tag = match tag::Entity::find()
         .filter(tag::Column::Slug.eq(slug))
+        .filter(tag::Column::Visible.eq(true))
         .one(&state.db)
         .await
     {
@@ -232,6 +242,8 @@ async fn filtered_articles(
                 article::Column::Title,
                 article::Column::Summary,
                 article::Column::PublishedAt,
+                article::Column::PaidColumnPublicId,
+                article::Column::SubscriberOnly,
             ])
             .order_by_desc(article::Column::PublishedAt)
             .limit(per_page)
@@ -254,7 +266,10 @@ async fn filtered_articles(
                     slug: row.slug,
                     title: row.title,
                     summary: row.summary,
+                    cover_url: None,
                     published_at: row.published_at,
+                    paid_column_public_id: row.paid_column_public_id,
+                    subscriber_only: row.subscriber_only,
                 })
                 .collect(),
         })

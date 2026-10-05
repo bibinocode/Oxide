@@ -5,6 +5,8 @@ interface Dot {
   x: number;
   y: number;
   radius: number;
+  /** 深色背景以亮部着墨，保持原图明暗关系而非生成负片。 */
+  darkRadius: number;
 }
 
 /** 原图转为半调印刷网点，指针接近时让网点轻微膨胀、偏移。 */
@@ -45,12 +47,14 @@ export function HalftonePortrait({ src, alt }: { src: string; alt: string }) {
       const ratio = Math.min(window.devicePixelRatio || 1, 2);
       context.setTransform(ratio, 0, 0, ratio, 0, 0);
       context.clearRect(0, 0, width, height);
+      const dark = document.documentElement.dataset.theme === "dark";
       context.fillStyle = getComputedStyle(document.documentElement).getPropertyValue(
-        "--page-text",
+        "--portrait-ink",
       );
       for (const dot of dots) {
         let { x, y } = dot;
-        let radius = dot.radius;
+        let radius = dark ? dot.darkRadius : dot.radius;
+        if (radius < 0.25) continue;
         if (pointer.intensity > 0.01) {
           const dx = x - pointer.x;
           const dy = y - pointer.y;
@@ -132,13 +136,17 @@ export function HalftonePortrait({ src, alt }: { src: string; alt: string }) {
       for (let y = 0; y < rows; y++) {
         for (let x = 0; x < columns; x++) {
           const luminance = Math.min(1, Math.max(0, (luminances[y * columns + x] - low) / range));
-          const ink = 1 - luminance;
-          if (ink < 0.08) continue;
           const px = (x + 0.5) * cell;
           const py = (y + 0.5) * cell;
-          const edge = Math.min(1, px / 16, (width - px) / 16, (height - py) / 18);
-          const radius = Math.min(cell * 0.51, Math.max(0, ink * edge) * cell * 0.55);
-          if (radius >= 0.25) dots.push({ x: px, y: py, radius });
+          // 透明素材保留透明区域；深色模式同时柔化上边缘，避免浅色原图形成硬方框。
+          const alpha = pixels[(y * columns + x) * 4 + 3] / 255;
+          const edge = Math.min(1, px / 16, (width - px) / 16, (height - py) / 18) * alpha;
+          const radius = Math.min(cell * 0.51, (1 - luminance) * edge * cell * 0.55);
+          const darkRadius = Math.min(
+            cell * 0.51,
+            luminance * edge * Math.min(1, py / 18) * cell * 0.55,
+          );
+          if (Math.max(radius, darkRadius) >= 0.25) dots.push({ x: px, y: py, radius, darkRadius });
         }
       }
       paint();

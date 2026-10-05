@@ -1,4 +1,4 @@
-[ ] 后台支持从Notion同步文章进行编辑发布
+[x] 后台支持从Notion同步文章进行编辑发布
 [x] 使用 Rig 实现文章摘要 Agent，发布前可生成并采纳候选摘要。
 [x] 编辑器空行 Space 唤起写作助手，选区解释、优化、续写和 Diff 审阅后采纳。
 [x] 写作 Agent 通过 SSE 流式输出，并在 CodeMirror 原位审阅 Diff。

@@ -10,7 +10,7 @@
   min-height: 48px;
   align-items: center;
   justify-content: space-between;
-  border-top: 1px solid var(--page-line);
+  border-top: var(--border-hairline) solid var(--page-line);
 }
 @keyframes skeleton-shimmer {
   to {

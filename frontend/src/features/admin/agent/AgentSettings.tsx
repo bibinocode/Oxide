@@ -22,6 +22,7 @@ interface Binding {
 const tasks = [
   { id: "writing", name: "写作", capability: "text" },
   { id: "summary", name: "摘要", capability: "text" },
+  { id: "comment_review", name: "评论自动审核", capability: "text" },
   { id: "image", name: "生图", capability: "image" },
   { id: "chat", name: "对话", capability: "text" },
 ] as const;
@@ -98,7 +99,7 @@ export function AgentSettings() {
   }
 
   async function bind(task: string, providerId: string) {
-    if (!session || !providerId) return;
+    if (!session) return;
     try {
       const result = await apiRequest<Binding>(`/api/v1/admin/agent/bindings/${task}`, {
         method: "PUT",
@@ -186,13 +187,16 @@ export function AgentSettings() {
               setDraft({
                 ...draft,
                 adapter: event.target.value as AgentProvider["adapter"],
-                base_url: event.target.value === "jimeng" ? "" : "https://api.openai.com/v1",
+                base_url:
+                  event.target.value === "jimeng"
+                    ? "https://ark.cn-beijing.volces.com/api/v3"
+                    : "https://api.openai.com/v1",
                 capability: event.target.value === "jimeng" ? "image" : draft.capability,
               })
             }
           >
             <option value="openai_compatible">OpenAI 兼容（OpenAI / DeepSeek）</option>
-            <option value="jimeng">即梦</option>
+            <option value="jimeng">即梦 / 火山方舟兼容接口</option>
           </select>
         </label>
         <label className="text-sm">
@@ -276,7 +280,9 @@ export function AgentSettings() {
               value={bindings.find((item) => item.task === task.id)?.provider_id ?? ""}
               onChange={(event) => bind(task.id, event.target.value)}
             >
-              <option value="">未绑定</option>
+              <option value="">
+                {task.id === "comment_review" ? "关闭自动审核（人工处理）" : "未绑定"}
+              </option>
               {providers
                 .filter((provider) => provider.enabled && provider.capability === task.capability)
                 .map((provider) => (

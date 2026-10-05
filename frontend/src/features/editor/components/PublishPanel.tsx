@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { Upload, X } from "lucide-react";
+import { Sparkles, Upload, X } from "lucide-react";
 import { apiRequest } from "../../../lib/api/client";
-import type { Taxonomy } from "../../../lib/api/types";
+import type { ArticleAccess, ColumnSummary, Taxonomy } from "../../../lib/api/types";
+import { Link } from "@tanstack/react-router";
 import { SummaryAssistant } from "./SummaryAssistant";
+import { ImageGenerator } from "./ImageGenerator";
 
 /** 封面只保存公开素材标识，正式媒体地址由服务端确定。 */
 export interface CoverSelection {
@@ -28,6 +30,8 @@ interface PublishPanelProps {
   pending: boolean;
   message: string;
   published: boolean;
+  access: ArticleAccess;
+  onAccess: (value: ArticleAccess) => void;
   onSlug: (value: string) => void;
   onSummary: (value: string) => void;
   onCover: (value: CoverSelection) => void;
@@ -42,7 +46,9 @@ interface PublishPanelProps {
 export function PublishPanel(props: PublishPanelProps) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [assets, setAssets] = useState<Asset[]>([]);
+  const [columns, setColumns] = useState<ColumnSummary[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => {
     const controller = new AbortController();
@@ -60,6 +66,9 @@ export function PublishPanel(props: PublishPanelProps) {
         if (!controller.signal.aborted)
           setError(cause instanceof Error ? cause.message : "封面素材加载失败");
       });
+    apiRequest<ColumnSummary[]>("/api/v1/admin/columns", { signal: controller.signal })
+      .then(setColumns)
+      .catch(() => undefined);
     return () => controller.abort();
   }, []);
   async function upload(file: File) {
@@ -122,6 +131,53 @@ export function PublishPanel(props: PublishPanelProps) {
             />
           </label>
           <SummaryAssistant title={props.title} source={props.source} onApply={props.onSummary} />
+          <fieldset className="space-y-4 border-t border-line pt-5">
+            <legend className="text-sm font-semibold">分类与小册</legend>
+            <TaxonomyChoices
+              label="分类"
+              items={props.categories}
+              selected={props.selectedCategories}
+              onChange={props.onCategories}
+            />
+            <label className="block text-sm">
+              所属小册
+              <select
+                className="field mt-2"
+                value={props.access.column_public_id ?? ""}
+                onChange={(event) =>
+                  props.onAccess({
+                    ...props.access,
+                    column_public_id: event.target.value || null,
+                    subscriber_only: event.target.value ? props.access.subscriber_only : false,
+                  })
+                }
+              >
+                <option value="">不加入小册</option>
+                {columns.map((column) => (
+                  <option key={column.public_id} value={column.public_id}>
+                    {column.title}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {columns.length === 0 && (
+              <Link to="/admin/columns" className="text-xs text-muted underline">
+                创建小册
+              </Link>
+            )}
+            {props.access.column_public_id && (
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={props.access.subscriber_only}
+                  onChange={(event) =>
+                    props.onAccess({ ...props.access, subscriber_only: event.target.checked })
+                  }
+                />
+                付费阅读（免费试看前 30%）
+              </label>
+            )}
+          </fieldset>
           <fieldset className="space-y-3">
             <legend className="mb-3 text-sm">文章主图</legend>
             {props.cover.media_url && (
@@ -150,6 +206,9 @@ export function PublishPanel(props: PublishPanelProps) {
                 }}
               />
             </label>
+            <button type="button" className="button-secondary" onClick={() => setGenerating(true)}>
+              <Sparkles size={15} /> 生成主图
+            </button>
             {assets.length > 0 && (
               <details>
                 <summary className="cursor-pointer text-xs text-muted">从素材库选择</summary>
@@ -175,13 +234,7 @@ export function PublishPanel(props: PublishPanelProps) {
               </details>
             )}
           </fieldset>
-          <div className="grid grid-cols-2 gap-6">
-            <TaxonomyChoices
-              label="分类"
-              items={props.categories}
-              selected={props.selectedCategories}
-              onChange={props.onCategories}
-            />
+          <div>
             <TaxonomyChoices
               label="标签"
               items={props.tags}
@@ -204,6 +257,15 @@ export function PublishPanel(props: PublishPanelProps) {
           </button>
         </footer>
       </form>
+      {generating && (
+        <ImageGenerator
+          purpose="cover"
+          title={props.title}
+          source={props.source}
+          onUse={(image) => props.onCover(image)}
+          onClose={() => setGenerating(false)}
+        />
+      )}
     </dialog>
   );
 }

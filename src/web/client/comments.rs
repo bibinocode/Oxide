@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use axum::{
     Json,
     extract::{Path, State},
-    http::{StatusCode, header},
+    http::{HeaderMap, StatusCode, header},
     response::{IntoResponse, Response},
 };
 use chrono::{DateTime, Utc};
@@ -19,7 +19,7 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::entity::{
-    article, comment,
+    article, comment, paid_column,
     status::{ArticleStatus, CommentStatus},
 };
 
@@ -93,9 +93,54 @@ fn email_hash(key: &str, email: &str) -> String {
     hex::encode(mac.finalize().into_bytes())
 }
 
+/// 下架小册的评论同样仅对已购读者开放；依赖故障时关闭访问而非绕过校验。
+async fn require_visible_article(
+    state: &AppState,
+    headers: &HeaderMap,
+    article: &article::Model,
+) -> Result<(), Response> {
+    let result = async {
+        let Some(id) = article.paid_column_public_id else {
+            return Ok(true);
+        };
+        let Some(column) = paid_column::Entity::find()
+            .filter(paid_column::Column::PublicId.eq(id))
+            .one(&state.db)
+            .await?
+        else {
+            return Ok(false);
+        };
+        if column.visible {
+            return Ok(true);
+        }
+        let Some(session) = super::reader::get_session(state, headers).await? else {
+            return Ok(false);
+        };
+        super::reader::owns_column(state, session.reader_id, column.id).await
+    }
+    .await;
+    match result {
+        Ok(true) => Ok(()),
+        Ok(false) => Err(error(
+            StatusCode::NOT_FOUND,
+            "article_not_found",
+            "文章不存在",
+        )),
+        Err(_) => Err(error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "dependency_unavailable",
+            "评论暂时不可用",
+        )),
+    }
+}
+
 /// 查询一篇已发布文章下的已审核评论。
 #[utoipa::path(get, path = "/api/v1/articles/{slug}/comments", params(("slug" = String, Path)), responses((status = 200, body = Vec<CommentResponse>), (status = 404, body = ApiError)), tag = "comments")]
-pub async fn list(State(state): State<AppState>, Path(slug): Path<String>) -> Response {
+pub async fn list(
+    State(state): State<AppState>,
+    Path(slug): Path<String>,
+    headers: HeaderMap,
+) -> Response {
     let result = async {
         let Some(article) = article::Entity::find()
             .filter(article::Column::Slug.eq(slug))
@@ -111,26 +156,38 @@ pub async fn list(State(state): State<AppState>, Path(slug): Path<String>) -> Re
             .order_by_asc(comment::Column::CreatedAt)
             .all(&state.db)
             .await?;
-        Ok(Some(rows))
+        Ok(Some((article, rows)))
     }
     .await;
     match result {
-        Ok(Some(rows)) => {
+        Ok(Some((article, rows))) => {
+            if let Err(response) = require_visible_article(&state, &headers, &article).await {
+                return response;
+            }
             let parents: HashMap<i64, Uuid> =
                 rows.iter().map(|row| (row.id, row.public_id)).collect();
-            Json(
-                rows.into_iter()
-                    .map(|row| CommentResponse {
-                        public_id: row.public_id,
-                        parent_public_id: row.parent_id.and_then(|id| parents.get(&id).copied()),
-                        nickname: row.nickname,
-                        body: row.body,
-                        avatar_url: format!("/api/v1/comments/{}/avatar.svg", row.public_id),
-                        created_at: row.created_at,
-                    })
-                    .collect::<Vec<_>>(),
+            (
+                [
+                    (header::CACHE_CONTROL, "private, no-store"),
+                    (header::VARY, "Cookie"),
+                ],
+                Json(
+                    rows.into_iter()
+                        .filter(|row| row.parent_id.is_none_or(|id| parents.contains_key(&id)))
+                        .map(|row| CommentResponse {
+                            public_id: row.public_id,
+                            parent_public_id: row
+                                .parent_id
+                                .and_then(|id| parents.get(&id).copied()),
+                            nickname: row.nickname,
+                            body: row.body,
+                            avatar_url: format!("/api/v1/comments/{}/avatar.svg", row.public_id),
+                            created_at: row.created_at,
+                        })
+                        .collect::<Vec<_>>(),
+                ),
             )
-            .into_response()
+                .into_response()
         }
         Ok(None) => error(StatusCode::NOT_FOUND, "article_not_found", "文章不存在"),
         Err(err) => {
@@ -149,6 +206,7 @@ pub async fn list(State(state): State<AppState>, Path(slug): Path<String>) -> Re
 pub async fn create(
     State(state): State<AppState>,
     Path(slug): Path<String>,
+    headers: HeaderMap,
     Json(input): Json<CommentInput>,
 ) -> Response {
     let Some(email) = validate(&input) else {
@@ -171,6 +229,9 @@ pub async fn create(
             );
         }
     };
+    if let Err(response) = require_visible_article(&state, &headers, &article).await {
+        return response;
+    }
     let parent_id = if let Some(public_id) = input.parent_public_id {
         match comment::Entity::find()
             .filter(comment::Column::PublicId.eq(public_id))
@@ -248,6 +309,9 @@ pub async fn create(
         status: Set(CommentStatus::Pending),
         created_at: Set(Utc::now()),
         reviewed_at: Set(None),
+        agent_review: Set(None),
+        review_source: Set(None),
+        review_version: Set(0),
     };
     match model.insert(&state.db).await {
         Ok(_) => (

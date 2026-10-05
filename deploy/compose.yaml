@@ -1,0 +1,88 @@
+# 独立 Compose 项目，可由 1Panel「容器 / 编排」管理。
+name: oxide
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: oxide_blog
+      POSTGRES_USER: oxide
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?required}
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U oxide -d oxide_blog']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+  redis:
+    image: redis:7-alpine
+    command: [redis-server, --appendonly, 'yes', --requirepass, '${REDIS_PASSWORD:?required}']
+    environment:
+      REDISCLI_AUTH: ${REDIS_PASSWORD:?required}
+    volumes:
+      - redis:/data
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+  api:
+    image: oxide-api:${RELEASE:?required}
+    env_file: app.env
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, curl, --fail, --silent, http://127.0.0.1:3001/health/ready]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+  frontend:
+    image: oxide-frontend:${FRONTEND_RELEASE:-${RELEASE:?required}}
+    environment:
+      API_INTERNAL_URL: http://api:3001
+      HOST: 0.0.0.0
+      PORT: '3000'
+      NODE_ENV: production
+    ports:
+      - '127.0.0.1:18080:3000'
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+  backup:
+    image: oxide-backup:${BACKUP_RELEASE:-20261005-backup}
+    env_file: backup.env
+    volumes:
+      - ../backup-recovery/recipient.txt:/config/recipient.txt:ro
+      - ../backups/cloud-state:/state
+      - ../backups/cloud-work:/work
+    depends_on:
+      postgres:
+        condition: service_healthy
+    init: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: [CMD, oxide-backup, status]
+      interval: 5m
+      timeout: 10s
+      retries: 2
+      start_period: 10m
+    restart: unless-stopped
+volumes:
+  postgres:
+  redis:

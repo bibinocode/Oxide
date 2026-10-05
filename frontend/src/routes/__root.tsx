@@ -5,11 +5,13 @@ import {
   createRootRoute,
   useRouterState,
 } from "@tanstack/react-router";
+import { PageRulers } from "../components/layout/PageRulers";
 import { SiteHeader } from "../components/layout/SiteHeader";
 import { SiteFooter } from "../components/layout/SiteFooter";
 import { getSiteData } from "../lib/api/server";
-import tailwindCss from "../styles/tailwind.css?url";
-import appScss from "../styles/app.scss?url";
+// 让 Start 的路由资源清单输出首屏 CSS；避免 SSR 独立编译 ?url 产生不存在的文件哈希。
+import "../styles/tailwind.css";
+import "../styles/app.scss";
 
 export const Route = createRootRoute({
   loader: ({ location }) =>
@@ -22,8 +24,6 @@ export const Route = createRootRoute({
       { name: "description", content: "文章、思考与记录。" },
     ],
     links: [
-      { rel: "stylesheet", href: tailwindCss },
-      { rel: "stylesheet", href: appScss },
       { rel: "alternate", type: "application/rss+xml", title: "Oxide RSS", href: "/feed.xml" },
     ],
   }),
@@ -52,7 +52,8 @@ function RootDocument({ children }: { children: React.ReactNode }) {
             <div className="column-guides" aria-hidden="true" />
             <div className="viewport-edge-fade viewport-edge-fade-top" aria-hidden="true" />
             <div className="viewport-edge-fade viewport-edge-fade-bottom" aria-hidden="true" />
-            <SiteHeader />
+            <PageRulers />
+            <SiteHeader projectsEnabled={site?.presentation?.projects.enabled ?? false} />
           </>
         )}
         {children}

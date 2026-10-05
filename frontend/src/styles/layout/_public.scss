@@ -21,18 +21,45 @@
   color: #aaa59d;
 }
 .section-rule {
-  border-top: 1px solid var(--page-line);
+  border-top: var(--border-hairline) solid var(--page-line);
 }
 .column-guides {
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: -1;
-}
-.column-guides {
   width: min(100%, var(--page-width));
   margin-inline: auto;
-  border-inline: 1px dashed color-mix(in srgb, var(--page-line) 70%, transparent);
+  user-select: none;
+  opacity: var(--column-guide-opacity);
+}
+/* 参考站导引线固定为 1 CSS 像素、2px 实线 / 2px 留白，避免发丝边框在高密度屏幕上过淡。 */
+.column-guides::before,
+.column-guides::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: repeating-linear-gradient(
+    to bottom,
+    color-mix(in oklab, var(--column-guide-ink) 45%, transparent) 0,
+    color-mix(in oklab, var(--column-guide-ink) 45%, transparent) 2px,
+    transparent 2px,
+    transparent 4px
+  );
+}
+.column-guides::before {
+  left: 0;
+}
+.column-guides::after {
+  right: 0;
+}
+/* 移动端导引线距屏幕至少 16px，内容再向内留 16px，避免文字压在线上。 */
+@media (max-width: 640px) {
+  .column-guides {
+    width: min(calc(100% - 32px), var(--page-width));
+  }
 }
 .viewport-edge-fade {
   position: fixed;
@@ -89,15 +116,15 @@
   color: var(--page-subtle);
 }
 .section-tag-index {
-  border: 1px solid var(--page-line);
+  border: var(--border-hairline) solid var(--page-line);
   padding: 1px 6px;
   font-variant-numeric: tabular-nums;
 }
 .section-tag-hatch {
   width: 12px;
   height: 20px;
-  border-block: 1px solid var(--page-line);
-  border-right: 1px solid var(--page-line);
+  border-block: var(--border-hairline) solid var(--page-line);
+  border-right: var(--border-hairline) solid var(--page-line);
   background: repeating-linear-gradient(-45deg, #b6b1a9 0 1px, transparent 1px 4px);
 }
 .section-tag-label {
@@ -108,15 +135,79 @@
   align-items: center;
   gap: 12px;
   min-height: 48px;
-  border-top: 1px solid var(--page-line);
+  border-top: var(--border-hairline) solid var(--page-line);
   font-size: 0.9375rem;
 }
 .catalog-row-title {
+  view-transition-class: article-title-morph;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 500;
+}
+.article-print-pile {
+  position: relative;
+  isolation: isolate;
+  flex: none;
+  display: block;
+  width: 4rem;
+  height: 2.75rem;
+  pointer-events: none;
+  user-select: none;
+  margin-block: 0.5rem;
+}
+/* 叠纸尺寸与偏转角度沿用参考项目，色彩使用本地设计变量。 */
+.article-print-sheet {
+  position: absolute;
+  inset: 1px;
+  border-radius: 3px;
+  background: var(--page-paper);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--page-text) 22%, transparent);
+}
+.article-print-sheet:first-child {
+  opacity: 0.62;
+  transform: translate(-2px, 1px) rotate(-1.6deg);
+}
+.article-print-sheet:nth-child(2) {
+  opacity: 0.82;
+  transform: translate(2px, -1px) rotate(1.1deg);
+}
+.article-print-thumb {
+  view-transition-class: article-cover-morph;
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 3px;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px var(--page-line);
+  background: var(--page-paper);
+}
+.article-print-thumb img,
+.article-print-dither {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.article-print-dither {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 240ms var(--ease-swift);
+}
+.article-print-dither.is-ready {
+  opacity: 1;
+}
+.catalog-row:hover .article-print-dither,
+.catalog-row:focus-visible .article-print-dither {
+  opacity: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .article-print-dither {
+    transition: none;
+  }
 }
 .catalog-row-leader {
   flex: 1;
@@ -146,13 +237,14 @@
   align-items: center;
   gap: 2px;
   padding: 6px;
-  border: 1px solid #d6d2cb;
+  border: var(--border-hairline) solid var(--page-line);
   border-radius: 999px;
-  background: rgb(251 250 247 / 92%);
+  background: var(--dock-bg);
   box-shadow: 0 7px 24px rgb(52 49 46 / 10%);
   backdrop-filter: blur(16px);
 }
-.site-dock a {
+.site-dock > a,
+.site-dock .preferences-trigger {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -164,8 +256,59 @@
     background 150ms var(--ease-swift),
     color 150ms var(--ease-swift);
 }
-.site-dock a:hover,
-.site-dock a[data-status="active"] {
-  background: #efede8;
+.site-dock > a:hover,
+.site-dock > a[data-status="active"],
+.site-dock > a[data-section-active="true"],
+.site-dock .preferences-trigger:hover,
+.site-dock .preferences-trigger[aria-expanded="true"] {
+  background: var(--preferences-control-bg);
   color: var(--page-text);
+}
+.site-dock-home-avatar {
+  display: block;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  object-fit: contain;
+  transform-origin: 50% 85%;
+  transition: transform 180ms var(--ease-swift);
+}
+.site-dock > a:hover .site-dock-home-avatar,
+.site-dock > a:focus-visible .site-dock-home-avatar {
+  transform: translateY(-1px) rotate(-6deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .site-dock-home-avatar {
+    transition: none;
+  }
+  .site-dock > a:hover .site-dock-home-avatar,
+  .site-dock > a:focus-visible .site-dock-home-avatar {
+    transform: none;
+  }
+}
+
+/* 弧形标尺置于边缘渐隐之上，白色差值混合让深浅背景均保留淡刻度。 */
+.page-rulers {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  pointer-events: none;
+  user-select: none;
+  mix-blend-mode: difference;
+}
+.page-ruler {
+  position: absolute;
+  left: 0;
+}
+.page-ruler-top {
+  top: 0;
+}
+.page-ruler-bottom {
+  bottom: 0;
+}
+.page-ruler-major {
+  stroke: var(--ruler-major-ink);
+}
+.page-ruler-minor {
+  stroke: var(--ruler-minor-ink);
 }

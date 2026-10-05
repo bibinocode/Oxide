@@ -37,6 +37,29 @@ pub struct Config {
     pub search_index_dir: String,
     /// 可选的 Notion 集成密钥，只传入后端服务。
     pub notion_api_key: Option<String>,
+    /// 微信 Native 扫码支付；未配置时保持付费内容锁定并拒绝下单。
+    pub wechat_pay: Option<WechatPayConfig>,
+}
+
+/// 微信支付商户材料只在服务端内存中使用。
+#[derive(Clone)]
+pub struct WechatPayConfig {
+    /// 商户号。
+    pub mch_id: String,
+    /// 已关联的应用 AppID。
+    pub app_id: String,
+    /// 商户 API 证书序列号。
+    pub merchant_serial: String,
+    /// 商户 RSA 私钥 PEM。
+    pub merchant_private_key: String,
+    /// API v3 32 字节对称密钥。
+    pub api_v3_key: String,
+    /// 微信支付平台公钥 PEM。
+    pub platform_public_key: String,
+    /// 平台公钥 ID 或平台证书序列号。
+    pub platform_serial: String,
+    /// 微信回调使用的 HTTPS 公网地址。
+    pub notify_url: String,
 }
 
 impl Config {
@@ -98,6 +121,53 @@ impl Config {
         if !matches!(parsed.scheme(), "http" | "https") || parsed.host_str().is_none() {
             bail!("PUBLIC_BASE_URL 必须是 HTTP(S) 绝对地址");
         }
+        let wechat_fields = [
+            "WECHAT_PAY_MCH_ID",
+            "WECHAT_PAY_APP_ID",
+            "WECHAT_PAY_MERCHANT_SERIAL",
+            "WECHAT_PAY_MERCHANT_PRIVATE_KEY_FILE",
+            "WECHAT_PAY_API_V3_KEY",
+            "WECHAT_PAY_PLATFORM_PUBLIC_KEY_FILE",
+            "WECHAT_PAY_PLATFORM_SERIAL",
+            "WECHAT_PAY_NOTIFY_URL",
+        ];
+        let configured = wechat_fields
+            .iter()
+            .filter(|key| get(key).is_some_and(|value| !value.trim().is_empty()))
+            .count();
+        let wechat_pay = if configured == 0 {
+            None
+        } else {
+            if configured != wechat_fields.len() {
+                bail!("微信支付配置不完整")
+            }
+            let value = |key| get(key).unwrap_or_default();
+            let api_v3_key = value("WECHAT_PAY_API_V3_KEY");
+            if api_v3_key.len() != 32 {
+                bail!("WECHAT_PAY_API_V3_KEY 必须为 32 字节")
+            }
+            let notify_url = value("WECHAT_PAY_NOTIFY_URL");
+            let url = url::Url::parse(&notify_url).context("微信支付回调地址无效")?;
+            if url.scheme() != "https" || url.host_str().is_none() {
+                bail!("微信支付回调必须使用公网 HTTPS")
+            }
+            Some(WechatPayConfig {
+                mch_id: value("WECHAT_PAY_MCH_ID"),
+                app_id: value("WECHAT_PAY_APP_ID"),
+                merchant_serial: value("WECHAT_PAY_MERCHANT_SERIAL"),
+                merchant_private_key: std::fs::read_to_string(value(
+                    "WECHAT_PAY_MERCHANT_PRIVATE_KEY_FILE",
+                ))
+                .context("读取微信商户私钥失败")?,
+                api_v3_key,
+                platform_public_key: std::fs::read_to_string(value(
+                    "WECHAT_PAY_PLATFORM_PUBLIC_KEY_FILE",
+                ))
+                .context("读取微信平台公钥失败")?,
+                platform_serial: value("WECHAT_PAY_PLATFORM_SERIAL"),
+                notify_url,
+            })
+        };
 
         Ok(Self {
             agent_tools_config: get("AGENT_TOOLS_CONFIG")
@@ -118,6 +188,7 @@ impl Config {
             search_index_dir: get("SEARCH_INDEX_DIR")
                 .unwrap_or_else(|| "./data/search-index".into()),
             notion_api_key: get("NOTION_API_KEY").filter(|value| !value.trim().is_empty()),
+            wechat_pay,
         })
     }
 }

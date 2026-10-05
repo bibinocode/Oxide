@@ -5,6 +5,8 @@ import { apiRequest } from "../../../lib/api/client";
 import { useArticleHtml } from "../hooks/useArticleHtml";
 import { useScrollReveal } from "../hooks/useScrollReveal";
 import { ImageLightbox, type ZoomImage } from "./ImageLightbox";
+import { ArticleCover } from "./ArticleCover";
+import { articleTransitionName } from "../articleMotion";
 
 interface ArticlePresentationProps {
   title: string;
@@ -13,6 +15,7 @@ interface ArticlePresentationProps {
   html: string;
   coverUrl?: string | null;
   bodyId?: string;
+  slug?: string;
 }
 
 interface LinkPreview {
@@ -40,6 +43,7 @@ export function ArticlePresentation({
   html,
   coverUrl,
   bodyId,
+  slug,
 }: ArticlePresentationProps) {
   const renderedHtml = useArticleHtml(html);
   const prose = useRef<HTMLDivElement>(null);
@@ -152,31 +156,17 @@ export function ArticlePresentation({
     }, 1500);
   }
   return (
-    <article className="article-reader" lang="zh-CN">
+    <article className={`article-reader${slug ? " article-route-enter" : ""}`} lang="zh-CN">
       {coverUrl && (
-        <figure className="article-cover">
-          <div className="article-cover-photo">
-            <img
-              src={coverUrl}
-              alt={title ? `${title} · 主图` : "文章主图"}
-              role="button"
-              tabIndex={0}
-              aria-label="放大文章主图"
-              onClick={(event) => openImage(event.currentTarget)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  openImage(event.currentTarget);
-                }
-              }}
-            />
-          </div>
-          <figcaption>{title || "文章主图"}</figcaption>
-        </figure>
+        <ArticleCover key={coverUrl} src={coverUrl} title={title} slug={slug} onOpen={openImage} />
       )}
       <header className="article-title-card">
         <div className="flex items-start justify-between gap-4">
-          <h1>{title || "未命名文章"}</h1>
+          <h1
+            style={{ viewTransitionName: slug ? articleTransitionName("title", slug) : undefined }}
+          >
+            {title || "未命名文章"}
+          </h1>
           <PixelMark />
         </div>
         <dl className="article-spec-plate">

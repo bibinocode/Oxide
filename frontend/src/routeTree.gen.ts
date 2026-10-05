@@ -13,15 +13,19 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as ArchiveRouteImport } from './routes/archive'
-import { Route as SearchRouteImport } from './routes/search'
+import { Route as ProjectsRouteImport } from './routes/projects'
+import { Route as ReaderRouteImport } from './routes/reader'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminAgentRouteImport } from './routes/admin.agent'
 import { Route as AdminAssetsRouteImport } from './routes/admin.assets'
+import { Route as AdminColumnsRouteImport } from './routes/admin.columns'
 import { Route as AdminCommentsRouteImport } from './routes/admin.comments'
 import { Route as AdminNotionRouteImport } from './routes/admin.notion'
 import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as ArticlesSlugRouteImport } from './routes/articles.$slug'
 import { Route as CategoriesSlugRouteImport } from './routes/categories.$slug'
+import { Route as ColumnsIndexRouteImport } from './routes/columns.index'
+import { Route as ColumnsSlugRouteImport } from './routes/columns.$slug'
 import { Route as TagsSlugRouteImport } from './routes/tags.$slug'
 import { Route as AdminArticlesPublicIdRouteImport } from './routes/admin.articles.$publicId'
 import { Route as AdminArticlesNewRouteImport } from './routes/admin.articles.new'
@@ -46,9 +50,14 @@ const ArchiveRoute = ArchiveRouteImport.update({
   path: '/archive',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SearchRoute = SearchRouteImport.update({
-  id: '/search',
-  path: '/search',
+const ProjectsRoute = ProjectsRouteImport.update({
+  id: '/projects',
+  path: '/projects',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReaderRoute = ReaderRouteImport.update({
+  id: '/reader',
+  path: '/reader',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
@@ -64,6 +73,11 @@ const AdminAgentRoute = AdminAgentRouteImport.update({
 const AdminAssetsRoute = AdminAssetsRouteImport.update({
   id: '/assets',
   path: '/assets',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminColumnsRoute = AdminColumnsRouteImport.update({
+  id: '/columns',
+  path: '/columns',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminCommentsRoute = AdminCommentsRouteImport.update({
@@ -91,6 +105,16 @@ const CategoriesSlugRoute = CategoriesSlugRouteImport.update({
   path: '/categories/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ColumnsIndexRoute = ColumnsIndexRouteImport.update({
+  id: '/columns/',
+  path: '/columns/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ColumnsSlugRoute = ColumnsSlugRouteImport.update({
+  id: '/columns/$slug',
+  path: '/columns/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TagsSlugRoute = TagsSlugRouteImport.update({
   id: '/tags/$slug',
   path: '/tags/$slug',
@@ -112,16 +136,20 @@ export interface FileRoutesByFullPath {
   '/about': typeof AboutRoute
   '/admin': typeof AdminRouteWithChildren
   '/archive': typeof ArchiveRoute
-  '/search': typeof SearchRoute
+  '/projects': typeof ProjectsRoute
+  '/reader': typeof ReaderRoute
   '/admin/agent': typeof AdminAgentRoute
   '/admin/assets': typeof AdminAssetsRoute
+  '/admin/columns': typeof AdminColumnsRoute
   '/admin/comments': typeof AdminCommentsRoute
   '/admin/notion': typeof AdminNotionRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/articles/$slug': typeof ArticlesSlugRoute
   '/categories/$slug': typeof CategoriesSlugRoute
+  '/columns/$slug': typeof ColumnsSlugRoute
   '/tags/$slug': typeof TagsSlugRoute
   '/admin/': typeof AdminIndexRoute
+  '/columns/': typeof ColumnsIndexRoute
   '/admin/articles/$publicId': typeof AdminArticlesPublicIdRoute
   '/admin/articles/new': typeof AdminArticlesNewRoute
 }
@@ -129,16 +157,20 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/archive': typeof ArchiveRoute
-  '/search': typeof SearchRoute
+  '/projects': typeof ProjectsRoute
+  '/reader': typeof ReaderRoute
   '/admin/agent': typeof AdminAgentRoute
   '/admin/assets': typeof AdminAssetsRoute
+  '/admin/columns': typeof AdminColumnsRoute
   '/admin/comments': typeof AdminCommentsRoute
   '/admin/notion': typeof AdminNotionRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/articles/$slug': typeof ArticlesSlugRoute
   '/categories/$slug': typeof CategoriesSlugRoute
+  '/columns/$slug': typeof ColumnsSlugRoute
   '/tags/$slug': typeof TagsSlugRoute
   '/admin': typeof AdminIndexRoute
+  '/columns': typeof ColumnsIndexRoute
   '/admin/articles/$publicId': typeof AdminArticlesPublicIdRoute
   '/admin/articles/new': typeof AdminArticlesNewRoute
 }
@@ -148,16 +180,20 @@ export interface FileRoutesById {
   '/about': typeof AboutRoute
   '/admin': typeof AdminRouteWithChildren
   '/archive': typeof ArchiveRoute
-  '/search': typeof SearchRoute
+  '/projects': typeof ProjectsRoute
+  '/reader': typeof ReaderRoute
   '/admin/agent': typeof AdminAgentRoute
   '/admin/assets': typeof AdminAssetsRoute
+  '/admin/columns': typeof AdminColumnsRoute
   '/admin/comments': typeof AdminCommentsRoute
   '/admin/notion': typeof AdminNotionRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/articles/$slug': typeof ArticlesSlugRoute
   '/categories/$slug': typeof CategoriesSlugRoute
+  '/columns/$slug': typeof ColumnsSlugRoute
   '/tags/$slug': typeof TagsSlugRoute
   '/admin/': typeof AdminIndexRoute
+  '/columns/': typeof ColumnsIndexRoute
   '/admin/articles/$publicId': typeof AdminArticlesPublicIdRoute
   '/admin/articles/new': typeof AdminArticlesNewRoute
 }
@@ -168,16 +204,20 @@ export interface FileRouteTypes {
     | '/about'
     | '/admin'
     | '/archive'
-    | '/search'
+    | '/projects'
+    | '/reader'
     | '/admin/agent'
     | '/admin/assets'
+    | '/admin/columns'
     | '/admin/comments'
     | '/admin/notion'
     | '/admin/settings'
     | '/articles/$slug'
     | '/categories/$slug'
+    | '/columns/$slug'
     | '/tags/$slug'
     | '/admin/'
+    | '/columns/'
     | '/admin/articles/$publicId'
     | '/admin/articles/new'
   fileRoutesByTo: FileRoutesByTo
@@ -185,16 +225,20 @@ export interface FileRouteTypes {
     | '/'
     | '/about'
     | '/archive'
-    | '/search'
+    | '/projects'
+    | '/reader'
     | '/admin/agent'
     | '/admin/assets'
+    | '/admin/columns'
     | '/admin/comments'
     | '/admin/notion'
     | '/admin/settings'
     | '/articles/$slug'
     | '/categories/$slug'
+    | '/columns/$slug'
     | '/tags/$slug'
     | '/admin'
+    | '/columns'
     | '/admin/articles/$publicId'
     | '/admin/articles/new'
   id:
@@ -203,16 +247,20 @@ export interface FileRouteTypes {
     | '/about'
     | '/admin'
     | '/archive'
-    | '/search'
+    | '/projects'
+    | '/reader'
     | '/admin/agent'
     | '/admin/assets'
+    | '/admin/columns'
     | '/admin/comments'
     | '/admin/notion'
     | '/admin/settings'
     | '/articles/$slug'
     | '/categories/$slug'
+    | '/columns/$slug'
     | '/tags/$slug'
     | '/admin/'
+    | '/columns/'
     | '/admin/articles/$publicId'
     | '/admin/articles/new'
   fileRoutesById: FileRoutesById
@@ -222,10 +270,13 @@ export interface RootRouteChildren {
   AboutRoute: typeof AboutRoute
   AdminRoute: typeof AdminRouteWithChildren
   ArchiveRoute: typeof ArchiveRoute
-  SearchRoute: typeof SearchRoute
+  ProjectsRoute: typeof ProjectsRoute
+  ReaderRoute: typeof ReaderRoute
   ArticlesSlugRoute: typeof ArticlesSlugRoute
   CategoriesSlugRoute: typeof CategoriesSlugRoute
+  ColumnsSlugRoute: typeof ColumnsSlugRoute
   TagsSlugRoute: typeof TagsSlugRoute
+  ColumnsIndexRoute: typeof ColumnsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -258,11 +309,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ArchiveRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/search': {
-      id: '/search'
-      path: '/search'
-      fullPath: '/search'
-      preLoaderRoute: typeof SearchRouteImport
+    '/projects': {
+      id: '/projects'
+      path: '/projects'
+      fullPath: '/projects'
+      preLoaderRoute: typeof ProjectsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reader': {
+      id: '/reader'
+      path: '/reader'
+      fullPath: '/reader'
+      preLoaderRoute: typeof ReaderRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/': {
@@ -284,6 +342,13 @@ declare module '@tanstack/react-router' {
       path: '/assets'
       fullPath: '/admin/assets'
       preLoaderRoute: typeof AdminAssetsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/columns': {
+      id: '/admin/columns'
+      path: '/columns'
+      fullPath: '/admin/columns'
+      preLoaderRoute: typeof AdminColumnsRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/comments': {
@@ -321,6 +386,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CategoriesSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/columns/': {
+      id: '/columns/'
+      path: '/columns'
+      fullPath: '/columns/'
+      preLoaderRoute: typeof ColumnsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/columns/$slug': {
+      id: '/columns/$slug'
+      path: '/columns/$slug'
+      fullPath: '/columns/$slug'
+      preLoaderRoute: typeof ColumnsSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/tags/$slug': {
       id: '/tags/$slug'
       path: '/tags/$slug'
@@ -348,6 +427,7 @@ declare module '@tanstack/react-router' {
 interface AdminRouteChildren {
   AdminAgentRoute: typeof AdminAgentRoute
   AdminAssetsRoute: typeof AdminAssetsRoute
+  AdminColumnsRoute: typeof AdminColumnsRoute
   AdminCommentsRoute: typeof AdminCommentsRoute
   AdminNotionRoute: typeof AdminNotionRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
@@ -359,6 +439,7 @@ interface AdminRouteChildren {
 const AdminRouteChildren: AdminRouteChildren = {
   AdminAgentRoute: AdminAgentRoute,
   AdminAssetsRoute: AdminAssetsRoute,
+  AdminColumnsRoute: AdminColumnsRoute,
   AdminCommentsRoute: AdminCommentsRoute,
   AdminNotionRoute: AdminNotionRoute,
   AdminSettingsRoute: AdminSettingsRoute,
@@ -374,10 +455,13 @@ const rootRouteChildren: RootRouteChildren = {
   AboutRoute: AboutRoute,
   AdminRoute: AdminRouteWithChildren,
   ArchiveRoute: ArchiveRoute,
-  SearchRoute: SearchRoute,
+  ProjectsRoute: ProjectsRoute,
+  ReaderRoute: ReaderRoute,
   ArticlesSlugRoute: ArticlesSlugRoute,
   CategoriesSlugRoute: CategoriesSlugRoute,
+  ColumnsSlugRoute: ColumnsSlugRoute,
   TagsSlugRoute: TagsSlugRoute,
+  ColumnsIndexRoute: ColumnsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

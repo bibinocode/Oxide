@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
+import { playUiSound } from "../../lib/sound";
 import { Monitor, Moon, Sun } from "lucide-react";
 
 type Theme = "system" | "light" | "dark";
 const storageKey = "oxide-theme";
 const options = [
-  { value: "system", label: "跟随系统", Icon: Monitor },
   { value: "light", label: "浅色", Icon: Sun },
+  { value: "system", label: "跟随系统", Icon: Monitor },
   { value: "dark", label: "深色", Icon: Moon },
 ] as const;
 
@@ -29,7 +30,13 @@ function applyTheme() {
       : theme;
 }
 
-export function ThemeControl({ compact = false }: { compact?: boolean }) {
+export function ThemeControl({
+  compact = false,
+  variant = "default",
+}: {
+  compact?: boolean;
+  variant?: "default" | "preferences";
+}) {
   const [theme, setTheme] = useState<Theme>("system");
   useEffect(() => {
     const sync = () => {
@@ -49,6 +56,7 @@ export function ThemeControl({ compact = false }: { compact?: boolean }) {
   }, []);
 
   function select(next: Theme) {
+    if (next !== theme) playUiSound("preference");
     try {
       localStorage.setItem(storageKey, next);
     } catch {
@@ -68,7 +76,7 @@ export function ThemeControl({ compact = false }: { compact?: boolean }) {
 
   return (
     <div
-      className={`theme-control ${compact ? "theme-control-compact" : ""}`}
+      className={`theme-control ${compact ? "theme-control-compact" : ""} ${variant === "preferences" ? "theme-control-preferences" : ""}`}
       role="group"
       aria-label="外观主题"
     >
@@ -81,7 +89,7 @@ export function ThemeControl({ compact = false }: { compact?: boolean }) {
           aria-pressed={theme === value}
           onClick={() => select(value)}
         >
-          <Icon size={15} />
+          <Icon size={variant === "preferences" ? 21 : 15} aria-hidden="true" />
         </button>
       ))}
     </div>

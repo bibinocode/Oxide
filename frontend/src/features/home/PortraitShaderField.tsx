@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ContourLines, PerlinNoise, Shader } from "shaders/react";
 
 /** 与参考站相同的噪声等高线着色器，只在悬停且 WebGPU 可用时加载。 */
@@ -11,6 +11,28 @@ export function PortraitShaderField({
 }) {
   const [ink, setInk] = useState("#34312e");
   const [ready, setReady] = useState(false);
+  const firstFrame = useRef(0);
+  const secondFrame = useRef(0);
+
+  const handleReady = useCallback(() => {
+    // 等着色器完成尺寸同步和首帧绘制，再让父级从最小尺寸揭示底纹。
+    cancelAnimationFrame(firstFrame.current);
+    cancelAnimationFrame(secondFrame.current);
+    firstFrame.current = requestAnimationFrame(() => {
+      secondFrame.current = requestAnimationFrame(() => {
+        setReady(true);
+        onReady();
+      });
+    });
+  }, [onReady]);
+
+  useEffect(
+    () => () => {
+      cancelAnimationFrame(firstFrame.current);
+      cancelAnimationFrame(secondFrame.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     const update = () =>
@@ -31,15 +53,13 @@ export function PortraitShaderField({
   }, [onUnavailable, ready]);
 
   return (
-    <span className="home-portrait-shader">
+    <span className="home-portrait-shader" data-ready={ready}>
       <Shader
         className="home-portrait-shader-canvas"
         colorSpace="srgb"
         disableTelemetry
-        onReady={() => {
-          setReady(true);
-          onReady();
-        }}
+        onUnavailable={onUnavailable}
+        onReady={handleReady}
       >
         <ContourLines
           levels={5}

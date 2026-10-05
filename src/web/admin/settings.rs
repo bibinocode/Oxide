@@ -6,7 +6,10 @@ use axum::{
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
 };
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder,
+    QuerySelect, Set, TransactionTrait,
+};
 use serde::Deserialize;
 use utoipa::ToSchema;
 
@@ -197,6 +200,7 @@ pub async fn create_category(
         _ => {}
     }
     match (category::ActiveModel {
+        visible: Set(true),
         name: Set(input.name.trim().into()),
         slug: Set(input.slug),
         ..Default::default()
@@ -209,6 +213,7 @@ pub async fn create_category(
             Json(TaxonomyResponse {
                 name: row.name,
                 slug: row.slug,
+                visible: row.visible,
             }),
         )
             .into_response(),
@@ -260,6 +265,7 @@ pub async fn update_category(
         Ok(row) => Json(TaxonomyResponse {
             name: row.name,
             slug: row.slug,
+            visible: row.visible,
         })
         .into_response(),
         Err(err) => {
@@ -273,7 +279,7 @@ pub async fn update_category(
     }
 }
 
-/// 删除无文章关联的分类；数据库外键阻止破坏引用。
+/// 删除分类并移除文章关联；正文保留，同一事务保证一致性。
 #[utoipa::path(delete, path = "/api/v1/admin/categories/{slug}", params(("slug" = String, Path)), responses((status = 204), (status = 409, body = ApiError)), tag = "admin")]
 pub async fn delete_category(
     State(state): State<AppState>,
@@ -283,14 +289,34 @@ pub async fn delete_category(
     if let Err(response) = require_admin(&state, &headers, true).await {
         return response;
     }
-    match category::Entity::delete_many()
-        .filter(category::Column::Slug.eq(slug))
-        .exec(&state.db)
-        .await
-    {
-        Ok(result) if result.rows_affected > 0 => StatusCode::NO_CONTENT.into_response(),
-        Ok(_) => error(StatusCode::NOT_FOUND, "category_not_found", "分类不存在"),
-        Err(_) => error(StatusCode::CONFLICT, "taxonomy_in_use", "分类仍被文章使用"),
+    let result = async {
+        let txn = state.db.begin().await?;
+        let Some(row) = category::Entity::find()
+            .filter(category::Column::Slug.eq(slug))
+            .lock_exclusive()
+            .one(&txn)
+            .await?
+        else {
+            return Ok::<_, sea_orm::DbErr>(false);
+        };
+        // 只清除分类/标签关联，绝不删除其下文章。
+        crate::entity::article_category::Entity::delete_many()
+            .filter(crate::entity::article_category::Column::CategoryId.eq(row.id))
+            .exec(&txn)
+            .await?;
+        category::Entity::delete_by_id(row.id).exec(&txn).await?;
+        txn.commit().await?;
+        Ok(true)
+    }
+    .await;
+    match result {
+        Ok(true) => StatusCode::NO_CONTENT.into_response(),
+        Ok(false) => error(StatusCode::NOT_FOUND, "category_not_found", "条目不存在"),
+        Err(_) => error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "internal_error",
+            "删除分类标签失败",
+        ),
     }
 }
 
@@ -324,6 +350,7 @@ pub async fn create_tag(
         _ => {}
     }
     match (tag::ActiveModel {
+        visible: Set(true),
         name: Set(input.name.trim().into()),
         slug: Set(input.slug),
         ..Default::default()
@@ -336,6 +363,7 @@ pub async fn create_tag(
             Json(TaxonomyResponse {
                 name: row.name,
                 slug: row.slug,
+                visible: row.visible,
             }),
         )
             .into_response(),
@@ -387,6 +415,7 @@ pub async fn update_tag(
         Ok(row) => Json(TaxonomyResponse {
             name: row.name,
             slug: row.slug,
+            visible: row.visible,
         })
         .into_response(),
         Err(err) => {
@@ -400,7 +429,7 @@ pub async fn update_tag(
     }
 }
 
-/// 删除无文章关联的标签。
+/// 删除标签并移除文章关联，不删除文章正文。
 #[utoipa::path(delete, path = "/api/v1/admin/tags/{slug}", params(("slug" = String, Path)), responses((status = 204), (status = 409, body = ApiError)), tag = "admin")]
 pub async fn delete_tag(
     State(state): State<AppState>,
@@ -410,13 +439,169 @@ pub async fn delete_tag(
     if let Err(response) = require_admin(&state, &headers, true).await {
         return response;
     }
-    match tag::Entity::delete_many()
-        .filter(tag::Column::Slug.eq(slug))
-        .exec(&state.db)
+    let result = async {
+        let txn = state.db.begin().await?;
+        let Some(row) = tag::Entity::find()
+            .filter(tag::Column::Slug.eq(slug))
+            .lock_exclusive()
+            .one(&txn)
+            .await?
+        else {
+            return Ok::<_, sea_orm::DbErr>(false);
+        };
+        // 只清除分类/标签关联，绝不删除其下文章。
+        crate::entity::article_tag::Entity::delete_many()
+            .filter(crate::entity::article_tag::Column::TagId.eq(row.id))
+            .exec(&txn)
+            .await?;
+        tag::Entity::delete_by_id(row.id).exec(&txn).await?;
+        txn.commit().await?;
+        Ok(true)
+    }
+    .await;
+    match result {
+        Ok(true) => StatusCode::NO_CONTENT.into_response(),
+        Ok(false) => error(StatusCode::NOT_FOUND, "tag_not_found", "条目不存在"),
+        Err(_) => error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "internal_error",
+            "删除分类标签失败",
+        ),
+    }
+}
+
+/// 管理端列出全部 category，包含隐藏条目。
+#[utoipa::path(get, path = "/api/v1/admin/categories", responses((status = 200, body = Vec<TaxonomyResponse>)), tag = "admin")]
+pub async fn list_category(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    if let Err(response) = require_admin(&state, &headers, false).await {
+        return response;
+    }
+    match category::Entity::find()
+        .order_by_asc(category::Column::Name)
+        .all(&state.db)
         .await
     {
-        Ok(result) if result.rows_affected > 0 => StatusCode::NO_CONTENT.into_response(),
-        Ok(_) => error(StatusCode::NOT_FOUND, "tag_not_found", "标签不存在"),
-        Err(_) => error(StatusCode::CONFLICT, "taxonomy_in_use", "标签仍被文章使用"),
+        Ok(rows) => Json(
+            rows.into_iter()
+                .map(|row| TaxonomyResponse {
+                    name: row.name,
+                    slug: row.slug,
+                    visible: row.visible,
+                })
+                .collect::<Vec<_>>(),
+        )
+        .into_response(),
+        Err(_) => error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "internal_error",
+            "分类标签读取失败",
+        ),
+    }
+}
+/// 隐藏分类标签不改变文章发布状态或所属关系。
+#[utoipa::path(patch, path = "/api/v1/admin/categories/{slug}", params(("slug" = String, Path)), request_body = super::ContentVisibilityInput, responses((status = 200, body = TaxonomyResponse)), tag = "admin")]
+pub async fn visibility_category(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(slug): Path<String>,
+    Json(input): Json<super::ContentVisibilityInput>,
+) -> Response {
+    if let Err(response) = require_admin(&state, &headers, true).await {
+        return response;
+    }
+    let result = async {
+        let Some(row) = category::Entity::find()
+            .filter(category::Column::Slug.eq(slug))
+            .one(&state.db)
+            .await?
+        else {
+            return Ok::<_, sea_orm::DbErr>(None);
+        };
+        let mut active = row.into_active_model();
+        active.visible = Set(input.visible);
+        active.update(&state.db).await.map(Some)
+    }
+    .await;
+    match result {
+        Ok(Some(row)) => Json(TaxonomyResponse {
+            name: row.name,
+            slug: row.slug,
+            visible: row.visible,
+        })
+        .into_response(),
+        Ok(None) => error(StatusCode::NOT_FOUND, "category_not_found", "条目不存在"),
+        Err(_) => error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "internal_error",
+            "可见性修改失败",
+        ),
+    }
+}
+
+/// 管理端列出全部 tag，包含隐藏条目。
+#[utoipa::path(get, path = "/api/v1/admin/tags", responses((status = 200, body = Vec<TaxonomyResponse>)), tag = "admin")]
+pub async fn list_tag(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    if let Err(response) = require_admin(&state, &headers, false).await {
+        return response;
+    }
+    match tag::Entity::find()
+        .order_by_asc(tag::Column::Name)
+        .all(&state.db)
+        .await
+    {
+        Ok(rows) => Json(
+            rows.into_iter()
+                .map(|row| TaxonomyResponse {
+                    name: row.name,
+                    slug: row.slug,
+                    visible: row.visible,
+                })
+                .collect::<Vec<_>>(),
+        )
+        .into_response(),
+        Err(_) => error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "internal_error",
+            "分类标签读取失败",
+        ),
+    }
+}
+/// 隐藏分类标签不改变文章发布状态或所属关系。
+#[utoipa::path(patch, path = "/api/v1/admin/tags/{slug}", params(("slug" = String, Path)), request_body = super::ContentVisibilityInput, responses((status = 200, body = TaxonomyResponse)), tag = "admin")]
+pub async fn visibility_tag(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(slug): Path<String>,
+    Json(input): Json<super::ContentVisibilityInput>,
+) -> Response {
+    if let Err(response) = require_admin(&state, &headers, true).await {
+        return response;
+    }
+    let result = async {
+        let Some(row) = tag::Entity::find()
+            .filter(tag::Column::Slug.eq(slug))
+            .one(&state.db)
+            .await?
+        else {
+            return Ok::<_, sea_orm::DbErr>(None);
+        };
+        let mut active = row.into_active_model();
+        active.visible = Set(input.visible);
+        active.update(&state.db).await.map(Some)
+    }
+    .await;
+    match result {
+        Ok(Some(row)) => Json(TaxonomyResponse {
+            name: row.name,
+            slug: row.slug,
+            visible: row.visible,
+        })
+        .into_response(),
+        Ok(None) => error(StatusCode::NOT_FOUND, "tag_not_found", "条目不存在"),
+        Err(_) => error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "internal_error",
+            "可见性修改失败",
+        ),
     }
 }

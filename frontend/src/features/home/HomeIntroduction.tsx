@@ -57,33 +57,37 @@ export function HomeIntroduction({
   value: HomeIntroductionValue;
 }) {
   return (
-    <section aria-labelledby="site-title" className="home-intro">
-      <div className="home-intro-copy">
-        <div className="flex items-center gap-3">
-          <h1 id="site-title" className="text-base font-semibold text-ink">
-            {name || "站点名称"}
-          </h1>
-          <PixelMark />
+    <div className="home-intro-container">
+      <section aria-labelledby="site-title" className="home-intro">
+        <div className="home-intro-copy">
+          <div className="flex items-center gap-3">
+            <h1 id="site-title" className="text-base font-semibold text-ink">
+              {name || "站点名称"}
+            </h1>
+            <PixelMark />
+          </div>
+          <div className="home-intro-body">
+            <Markdown
+              components={{
+                a: ({ href, children }) => (
+                  <IntroLink
+                    href={href}
+                    portraitUrl={value.portrait_url}
+                    xiaohongshu={value.xiaohongshu}
+                  >
+                    {children}
+                  </IntroLink>
+                ),
+              }}
+            >
+              {value.body.trim() || description || "关于技术、设计与日常的记录。"}
+            </Markdown>
+          </div>
         </div>
-        <div className="home-intro-body">
-          <Markdown
-            components={{
-              a: ({ href, children }) => (
-                <IntroLink
-                  href={href}
-                  portraitUrl={value.portrait_url}
-                  xiaohongshu={value.xiaohongshu}
-                >
-                  {children}
-                </IntroLink>
-              ),
-            }}
-          >
-            {value.body.trim() || description || "关于技术、设计与日常的记录。"}
-          </Markdown>
-        </div>
-      </div>
-      {value.portrait_url && <HalftonePortrait src={value.portrait_url} alt={value.portrait_alt} />}
-    </section>
+        {value.portrait_url && (
+          <HalftonePortrait src={value.portrait_url} alt={value.portrait_alt} />
+        )}
+      </section>
+    </div>
   );
 }

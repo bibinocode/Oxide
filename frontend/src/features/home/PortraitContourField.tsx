@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useRef, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
 
 const PortraitShaderField = lazy(() =>
   import("./PortraitShaderField").then((module) => ({ default: module.PortraitShaderField })),
@@ -158,10 +158,14 @@ function CanvasContourField({ active, motion }: { active: boolean; motion: boole
 
     const resize = new ResizeObserver(() => draw(performance.now()));
     resize.observe(canvas);
+    // 减少动画模式下没有持续帧循环，仍需在主题切换时重绘静态等高线。
+    const theme = new MutationObserver(() => draw(performance.now()));
+    theme.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
     draw(performance.now());
     if (motion) frame = requestAnimationFrame(tick);
     return () => {
       resize.disconnect();
+      theme.disconnect();
       if (frame) cancelAnimationFrame(frame);
     };
   }, [active, motion]);
@@ -173,10 +177,16 @@ function CanvasContourField({ active, motion }: { active: boolean; motion: boole
 export function PortraitContourField({ active, motion }: { active: boolean; motion: boolean }) {
   const [supported, setSupported] = useState<boolean | null>(null);
   const [shaderReady, setShaderReady] = useState(false);
+  const markReady = useCallback(() => setShaderReady(true), []);
+  const markUnavailable = useCallback(() => {
+    setShaderReady(false);
+    setSupported(false);
+  }, []);
 
   useEffect(() => {
     if (!active || !motion || supported !== null) return;
     let cancelled = false;
+    let timeout: number | undefined;
     const gpu = (
       navigator as Navigator & { gpu?: { requestAdapter: () => Promise<unknown | null> } }
     ).gpu;
@@ -184,8 +194,13 @@ export function PortraitContourField({ active, motion }: { active: boolean; moti
       setSupported(false);
       return;
     }
-    void gpu
-      .requestAdapter()
+    // 首次探测期间不显示另一套底纹，防止着色器接管时等高线尺度跳变。
+    void Promise.race([
+      gpu.requestAdapter(),
+      new Promise<null>((resolve) => {
+        timeout = window.setTimeout(() => resolve(null), 1500);
+      }),
+    ])
       .then((adapter) => {
         if (!cancelled) setSupported(Boolean(adapter));
       })
@@ -194,6 +209,7 @@ export function PortraitContourField({ active, motion }: { active: boolean; moti
       });
     return () => {
       cancelled = true;
+      window.clearTimeout(timeout);
     };
   }, [active, motion, supported]);
 
@@ -202,20 +218,19 @@ export function PortraitContourField({ active, motion }: { active: boolean; moti
   }, [active]);
 
   const showShader = active && motion && supported === true;
+  const showCanvas = active && (!motion || supported === false);
+  const visible = active && (showCanvas || (showShader && shaderReady));
   return (
-    <span className="home-portrait-field" data-active={active} aria-hidden="true">
-      {(!showShader || !shaderReady) && (
-        <CanvasContourField active={active} motion={motion && !showShader} />
-      )}
+    <span
+      className="home-portrait-field"
+      data-active={visible}
+      data-motion={motion}
+      aria-hidden="true"
+    >
+      {showCanvas && <CanvasContourField active={active} motion={motion} />}
       {showShader && (
         <Suspense fallback={null}>
-          <PortraitShaderField
-            onReady={() => setShaderReady(true)}
-            onUnavailable={() => {
-              setShaderReady(false);
-              setSupported(false);
-            }}
-          />
+          <PortraitShaderField onReady={markReady} onUnavailable={markUnavailable} />
         </Suspense>
       )}
     </span>

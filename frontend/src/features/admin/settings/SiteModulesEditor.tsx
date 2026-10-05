@@ -28,6 +28,7 @@ export function SiteModulesEditor({
       />
       <SectionEditor
         title="项目作品集"
+        description="开启独立的 /projects 页面，并显示导航与页脚入口；关闭时保留项目内容。"
         value={value.projects}
         onChange={(projects) => onChange({ ...value, projects })}
       />
@@ -43,16 +44,19 @@ export function SiteModulesEditor({
 /** 数组顺序即公开顺序，关闭模块时保留其全部条目。 */
 function SectionEditor({
   title,
+  description,
   value,
   onChange,
 }: {
   title: string;
+  description?: string;
   value: SiteSection;
   onChange: (value: SiteSection) => void;
 }) {
   return (
     <fieldset className="space-y-4">
       <legend className="mb-3 text-sm font-semibold">{title}</legend>
+      {description && <p className="text-xs leading-6 text-muted">{description}</p>}
       <label className="flex items-center gap-2 text-sm">
         <input
           type="checkbox"
@@ -106,6 +110,24 @@ function SectionEditor({
               })
             }
           />
+          {title === "项目作品集" && (
+            <input
+              aria-label={`项目图标 ${index + 1}`}
+              className="field"
+              type="url"
+              placeholder="项目图标 https://…（选填）"
+              maxLength={2048}
+              value={item.avatar_url ?? ""}
+              onChange={(event) =>
+                onChange({
+                  ...value,
+                  items: value.items.map((old, i) =>
+                    i === index ? { ...old, avatar_url: event.target.value } : old,
+                  ),
+                })
+              }
+            />
+          )}
           {title !== "联系方式" && (
             <input
               aria-label={`${title}说明 ${index + 1}`}

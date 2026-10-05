@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, ArrowUp, ListTree, X } from "lucide-react";
+import { ArrowLeft, ArrowUp, ListTree, LockKeyhole, X } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { useArticleOutline } from "../hooks/useArticleOutline";
 
@@ -8,12 +8,23 @@ export function ArticleOutline({
   bodyId,
   html,
   title,
+  outline,
+  columnSlug,
 }: {
   bodyId: string;
   html: string;
   title: string;
+  outline?: { level: 2 | 3; label: string; available: boolean }[];
+  columnSlug?: string | null;
 }) {
-  const { items, activeId, progress } = useArticleOutline(bodyId, html, title);
+  const { items: visibleItems, activeId, progress } = useArticleOutline(bodyId, html, title);
+  // 全文大纲由服务端只返回标题；不可读小节不需要下载正文即可展示。
+  const items = outline
+    ? [
+        { id: "article-start", label: title, level: 1, available: true },
+        ...outline.map((item, index) => ({ ...item, id: `article-section-${index + 1}` })),
+      ]
+    : visibleItems.map((item) => ({ ...item, available: true }));
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -75,15 +86,22 @@ export function ArticleOutline({
         <ol className="article-outline-list">
           {items.map((item) => (
             <li key={item.id} data-level={item.level}>
-              <a
-                href={`#${item.id}`}
-                aria-current={activeId === item.id ? "location" : undefined}
-                title={item.label}
-                onClick={(event) => visit(event, item.id)}
-              >
-                <span className="article-outline-tick" aria-hidden="true" />
-                <span className="article-outline-label">{item.label}</span>
-              </a>
+              {!item.available && columnSlug ? (
+                <Link to="/columns/$slug" params={{ slug: columnSlug }} title="订阅后阅读">
+                  <LockKeyhole size={12} aria-label="订阅后阅读" />
+                  <span className="article-outline-label">{item.label}</span>
+                </Link>
+              ) : (
+                <a
+                  href={`#${item.id}`}
+                  aria-current={activeId === item.id ? "location" : undefined}
+                  title={item.label}
+                  onClick={(event) => visit(event, item.id)}
+                >
+                  <span className="article-outline-tick" aria-hidden="true" />
+                  <span className="article-outline-label">{item.label}</span>
+                </a>
+              )}
             </li>
           ))}
         </ol>

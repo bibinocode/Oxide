@@ -7,8 +7,21 @@
   display: grid;
   grid-template-columns: 1.3fr 1fr 1fr;
   gap: 24px;
-  border-top: 1px solid var(--page-line);
+  border-top: var(--border-hairline) solid var(--page-line);
   padding-top: 28px;
+}
+.site-footer-grid > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+/* 手机端署名介绍独占首行，联系和索引共享下一行，避免按 DOM 顺序错列。 */
+@media (max-width: 640px) {
+  .site-footer-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .site-footer-introduction {
+    grid-column: 1 / -1;
+  }
 }
 .site-footer h2 {
   font-size: 11px;
@@ -21,7 +34,7 @@
 .site-footer li {
   position: relative;
   padding: 4px 0 4px 16px;
-  border-left: 1px solid var(--page-line);
+  border-left: var(--border-hairline) solid var(--page-line);
 }
 .site-footer li::before {
   content: "";
@@ -29,7 +42,7 @@
   top: 14px;
   left: 0;
   width: 9px;
-  border-top: 1px solid var(--page-line);
+  border-top: var(--border-hairline) solid var(--page-line);
 }
 .site-footer a:hover {
   color: var(--page-text);

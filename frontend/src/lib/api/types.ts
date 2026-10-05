@@ -3,12 +3,48 @@ export interface ArticleSummary {
   slug: string;
   title: string;
   summary: string | null;
+  cover_url: string | null;
   published_at: string | null;
+  paid_column_public_id: string | null;
+  subscriber_only: boolean;
 }
 
 export interface ArticleDetail extends ArticleSummary {
+  outline: { level: 2 | 3; label: string; available: boolean }[];
   rendered_html: string;
   cover_url: string | null;
+  locked: boolean;
+  column_slug: string | null;
+}
+
+export interface ColumnSummary {
+  visible: boolean;
+  public_id: string;
+  slug: string;
+  title: string;
+  description: string;
+  price_cents: number;
+}
+
+export interface ColumnDetail extends ColumnSummary {
+  articles: ArticleSummary[];
+  subscribed: boolean;
+  payment_available: boolean;
+}
+
+export interface ArticleAccess {
+  column_public_id: string | null;
+  subscriber_only: boolean;
+}
+
+export interface ReaderSession {
+  username: string;
+  csrf_token: string;
+}
+
+export interface CheckoutOrder {
+  order_id: string;
+  code_url: string;
 }
 
 export interface ArticlePage {
@@ -38,6 +74,7 @@ export interface SiteSection {
 }
 export interface SitePresentation {
   home_intro: HomeIntroduction;
+  about_body: string;
   footer_text: string;
   contacts: SiteSection;
   projects: SiteSection;
@@ -68,6 +105,7 @@ export function emptyXiaohongshuCard(): XiaohongshuCard {
 /** 旧站点未填写模块时保持空列表，不显示占位或虚构内容。 */
 export function emptyPresentation(): SitePresentation {
   return {
+    about_body: "",
     home_intro: {
       enabled: false,
       body: "",
@@ -83,6 +121,7 @@ export function emptyPresentation(): SitePresentation {
 }
 
 export interface Taxonomy {
+  visible: boolean;
   name: string;
   slug: string;
 }
@@ -102,6 +141,7 @@ export interface AdminArticle extends ArticleSummary {
   updated_at: string;
   notion_page_id: string | null;
   notion_last_edited_at: string | null;
+  access: ArticleAccess;
 }
 
 export interface NotionPage {

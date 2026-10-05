@@ -37,7 +37,8 @@
   height: 159%;
   pointer-events: none;
   opacity: 0;
-  transform: scale(0.94);
+  transform: scale(0.2);
+  transform-origin: 45% 44%;
   mask-image: radial-gradient(
     ellipse at 45% 44%,
     transparent 0 19%,
@@ -62,6 +63,9 @@
   height: 100%;
 }
 .home-portrait-shader {
+  opacity: 0;
+}
+.home-portrait-shader[data-ready="true"] {
   opacity: 0.1;
 }
 .home-portrait-source,
@@ -81,4 +85,10 @@
 }
 .home-portrait-canvas {
   display: block;
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-portrait-field {
+    transition: none;
+    transform: none;
+  }
 }

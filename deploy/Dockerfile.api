@@ -1,0 +1,21 @@
+# 使用项目指定版本，在服务器架构上生成后端与迁移制品。
+ARG API_BUILD_IMAGE=rust:1.96-bookworm
+FROM ${API_BUILD_IMAGE} AS build
+WORKDIR /app
+COPY Cargo.toml Cargo.lock ./
+COPY src ./src
+COPY migration ./migration
+ENV CARGO_BUILD_JOBS=2
+RUN cargo build --locked --release --workspace --bin rust-Oxide --bin rust-oxide-migration
+
+FROM debian:bookworm-slim AS runtime
+RUN apt-get update && apt-get install --no-install-recommends -y ca-certificates libssl3 curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --gid 10001 oxide && useradd --uid 10001 --gid oxide --no-create-home oxide
+WORKDIR /app
+COPY --from=build /app/target/release/rust-Oxide /usr/local/bin/oxide
+COPY --from=build /app/target/release/rust-oxide-migration /usr/local/bin/oxide-migrate
+RUN mkdir -p /app/data && chown oxide:oxide /app/data
+USER oxide
+EXPOSE 3001
+ENTRYPOINT ["/usr/local/bin/oxide"]

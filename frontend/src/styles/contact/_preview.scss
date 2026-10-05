@@ -3,23 +3,26 @@
   display: inline-block;
 }
 .contact-preview-card {
-  position: absolute;
-  z-index: 20;
-  bottom: calc(100% + 9px);
-  left: -14px;
+  /* 使用 Popover 顶层；固定坐标以视口为基准，不被父容器的 contain / transform 改写。 */
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  top: var(--contact-top, auto);
+  bottom: var(--contact-bottom, auto);
+  left: var(--contact-left, 16px);
   display: flex;
   width: 294px;
   max-width: calc(100vw - 32px);
   flex-direction: column;
   gap: 11px;
   padding: 15px;
-  border: 1px solid var(--page-line);
+  border: var(--border-hairline) solid var(--page-line);
   border-radius: 4px;
   background: var(--page-bg);
   box-shadow: 0 12px 30px rgb(52 49 46 / 12%);
   color: var(--page-text);
   font-size: 12px;
-  opacity: 0;
+  opacity: 1;
   pointer-events: none;
   transform: translateY(5px);
   transition: none;
@@ -191,7 +194,7 @@
   justify-content: space-between;
   gap: 8px;
   margin-top: 2px;
-  border-top: 1px solid var(--page-line);
+  border-top: var(--border-hairline) solid var(--page-line);
   padding-top: 8px;
   color: var(--page-subtle);
   font: 11px var(--font-mono);
@@ -208,13 +211,12 @@
   color: var(--page-subtle);
   font: 11px var(--font-mono);
 }
-.contact-preview:hover .contact-preview-card,
-.contact-preview:focus-within .contact-preview-card {
-  opacity: 1;
+/* 关闭时彻底隐藏，显示时始终使用实色底，避免过渡帧透出正文。 */
+.contact-preview-card:not(:popover-open) {
+  display: none;
+}
+.contact-preview-card:popover-open {
   transform: translateY(0);
-  transition:
-    opacity 150ms ease,
-    transform 150ms ease;
 }
 .contact-preview-heading {
   display: flex;
